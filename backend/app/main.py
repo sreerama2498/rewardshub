@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+?from fastapi import FastAPI
 from fastapi import Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -6,6 +6,8 @@ from app.schemas.profile import (ProfileUpdate,PasswordChange)
 from app.database.connection import engine
 from app.database.base import Base
 from app.models.audit_log import AuditLog
+
+from fastapi import HTTPException
 
 from datetime import date
 from datetime import timedelta
@@ -869,11 +871,11 @@ def get_audit_logs(
     db: Session = Depends(get_db)
 ):
 
-    if current_user.role != "ADMIN":
-
-        return {
-            "message": "Admin only"
-        }
+     if current_user.role != "ADMIN":
+    raise HTTPException(
+        status_code=403,
+        detail="Admin only"
+    )
 
     logs = (
         db.query(AuditLog)

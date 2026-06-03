@@ -67,8 +67,10 @@ export default function AdminPanel() {
         );
 
       setUsers(
-        usersResponse.data
-      );
+  Array.isArray(usersResponse.data)
+    ? usersResponse.data
+    : []
+);
 
       const logsResponse =
         await api.get(
@@ -77,8 +79,10 @@ export default function AdminPanel() {
         );
 
       setLogs(
-        logsResponse.data
-      );
+  Array.isArray(logsResponse.data)
+    ? logsResponse.data
+    : []
+);
 
     } catch (error) {
 
