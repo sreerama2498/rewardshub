@@ -731,7 +731,10 @@ def verify_admin(
 
     if current_user.role != "ADMIN":
 
-        return False
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
 
     return True
 
@@ -871,11 +874,11 @@ def get_audit_logs(
     db: Session = Depends(get_db)
 ):
 
-     if current_user.role != "ADMIN":
-    raise HTTPException(
-        status_code=403,
-        detail="Admin only"
-    )
+    if current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail="Admin only"
+        )
 
     logs = (
         db.query(AuditLog)
