@@ -4,10 +4,12 @@ import os
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://rewarduser:rewardpass@localhost:5432/rewardshub"
+    "postgresql://rewarduser:rewardpass@postgres:5432/rewardshub"
 )
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL
+)
 
 SessionLocal = sessionmaker(
     autocommit=False,

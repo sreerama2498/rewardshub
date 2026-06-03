@@ -1,4 +1,5 @@
 services:
+
   postgres:
 
     image: postgres:16
@@ -42,8 +43,8 @@ services:
     depends_on:
       - backend
 
-    expose:
-      - "5173"
+    ports:
+      - "5173:5173"
 
   nginx:
 
@@ -58,6 +59,10 @@ services:
 
     ports:
       - "80:80"
+      - "443:443"
+
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
 
 volumes:
   postgres_data:
