@@ -22,11 +22,18 @@ export default function Login() {
           password
         }
       );
+
       console.log("LOGIN RESPONSE:");
       console.log(response.data);
+
       localStorage.setItem(
         "token",
         response.data.access_token
+      );
+
+      console.log(
+        "TOKEN STORED:",
+        localStorage.getItem("token")
       );
 
       toast.success(
@@ -37,6 +44,7 @@ export default function Login() {
 
     } catch (error) {
 
+      console.log("LOGIN ERROR:");
       console.log(error);
 
       toast.error(
