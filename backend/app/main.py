@@ -613,7 +613,7 @@ def get_activity(
             {
                 "type": "Coupon Created",
                 "title": coupon.title,
-                "created_at": coupon.created_at
+                "created_at": coupon.created_date
             }
         )
 

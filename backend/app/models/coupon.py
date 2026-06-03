@@ -1,15 +1,18 @@
 from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
-from sqlalchemy import Date
 from sqlalchemy import Boolean
-from sqlalchemy import ForeignKey
+from sqlalchemy import Date
 from sqlalchemy import DateTime
+from sqlalchemy import ForeignKey
+
 from datetime import datetime
+
 from app.database.base import Base
 
 
 class Coupon(Base):
+
     __tablename__ = "coupons"
 
     id = Column(
@@ -53,13 +56,13 @@ class Coupon(Base):
         ForeignKey("users.id")
     )
 
-created_at = Column(
-    DateTime,
-    default=datetime.utcnow
-)
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
 
-updated_at = Column(
-    DateTime,
-    default=datetime.utcnow,
-    onupdate=datetime.utcnow
-)
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
