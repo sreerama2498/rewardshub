@@ -1,0 +1,977 @@
+from fastapi import FastAPI
+from fastapi import Depends
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from app.schemas.profile import (ProfileUpdate,PasswordChange)
+from app.database.connection import engine
+from app.database.base import Base
+from app.models.audit_log import AuditLog
+
+from datetime import date
+from datetime import timedelta
+
+from app.dependencies.database import get_db
+from app.dependencies.auth import get_current_user
+
+from app.core.security import (hash_password,verify_password,create_access_token)
+
+from app.models.user import User
+from app.models.coupon import Coupon
+from app.models.share import CouponShare
+
+from app.schemas.user import UserCreate
+from app.schemas.user import UserLogin
+from app.schemas.coupon import CouponCreate
+from app.schemas.share import ShareCouponRequest
+
+import app.models.user
+import app.models.coupon
+import app.models.share
+
+# Notifications
+from app.models.notification import Notification
+
+Base.metadata.create_all(bind=engine)
+
+def create_audit_log(
+    db,
+    user_id,
+    action,
+    details
+):
+
+    log = AuditLog(
+
+        user_id=user_id,
+
+        action=action,
+
+        details=details
+
+    )
+
+    db.add(log)
+
+    db.commit()
+
+
+def create_notification(
+    db,
+    user_id,
+    title,
+    message
+):
+
+    notification = Notification(
+
+        user_id=user_id,
+
+        title=title,
+
+        message=message
+
+    )
+
+    db.add(notification)
+
+    db.commit()
+
+
+app = FastAPI(
+    title="RewardsHub API"
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def root():
+    return {
+        "message": "RewardsHub API Running"
+    }
+
+
+# -------------------------
+# REGISTER
+# -------------------------
+
+@app.post("/register")
+def register_user(
+    user: UserCreate,
+    db: Session = Depends(get_db)
+):
+    existing_user = (
+        db.query(User)
+        .filter(User.email == user.email)
+        .first()
+    )
+
+    if existing_user:
+        return {
+            "message": "Email already exists"
+        }
+
+    new_user = User(
+        name=user.name,
+        email=user.email,
+        password_hash=hash_password(
+            user.password
+        )
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {
+        "message": "User created successfully",
+        "id": new_user.id
+    }
+
+
+# -------------------------
+# LOGIN
+# -------------------------
+
+@app.post("/login")
+def login(
+    user: UserLogin,
+    db: Session = Depends(get_db)
+):
+    existing_user = (
+        db.query(User)
+        .filter(User.email == user.email)
+        .first()
+    )
+
+    if not existing_user:
+        return {
+            "message": "Invalid credentials"
+        }
+
+    valid = verify_password(
+        user.password,
+        existing_user.password_hash
+    )
+
+    if not valid:
+        return {
+            "message": "Invalid credentials"
+        }
+
+    token = create_access_token(
+        {
+            "sub": str(existing_user.id),
+            "email": existing_user.email
+        }
+    )
+
+    create_audit_log(
+        db,
+        existing_user.id,
+        "LOGIN",
+        f"{existing_user.email} logged in"
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
+
+
+# -------------------------
+# CURRENT USER
+# -------------------------
+
+@app.get("/me")
+def get_me(
+    current_user: User = Depends(get_current_user)
+):
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email
+    }
+
+
+# -------------------------
+# CREATE COUPON
+# -------------------------
+
+@app.post("/coupons")
+def create_coupon(
+    coupon: CouponCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    new_coupon = Coupon(
+        title=coupon.title,
+        description=coupon.description,
+        source_app=coupon.source_app,
+        coupon_code=coupon.coupon_code,
+        expiry_date=coupon.expiry_date,
+        owner_id=current_user.id
+    )
+
+    db.add(new_coupon)
+    db.commit()
+    db.refresh(new_coupon)
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "CREATE_COUPON",
+        coupon.title
+    )
+
+    return {
+        "message": "Coupon created",
+        "coupon_id": new_coupon.id
+    }
+
+
+# -------------------------
+# MY COUPONS
+# -------------------------
+
+@app.get("/my-coupons")
+def my_coupons(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    coupons = (
+        db.query(Coupon)
+        .filter(
+            Coupon.owner_id == current_user.id
+        )
+        .all()
+    )
+
+    return coupons
+
+
+# -------------------------
+# SHARE COUPON
+# -------------------------
+
+@app.post("/share-coupon")
+def share_coupon(
+    request: ShareCouponRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    coupon = (
+        db.query(Coupon)
+        .filter(
+            Coupon.id == request.coupon_id,
+            Coupon.owner_id == current_user.id
+        )
+        .first()
+    )
+
+    if not coupon:
+        return {
+            "message": "Coupon not found"
+        }
+
+    receiver = (
+        db.query(User)
+        .filter(
+            User.email == request.receiver_email
+        )
+        .first()
+    )
+
+    if not receiver:
+        return {
+            "message": "Receiver not found"
+        }
+
+    existing_share = (
+        db.query(CouponShare)
+        .filter(
+            CouponShare.coupon_id == coupon.id,
+            CouponShare.sender_id == current_user.id,
+            CouponShare.receiver_id == receiver.id
+        )
+        .first()
+    )
+
+    if existing_share:
+        return {
+            "message": "Coupon already shared with this user"
+        }
+
+    share = CouponShare(
+        coupon_id=coupon.id,
+        sender_id=current_user.id,
+        receiver_id=receiver.id,
+        status="PENDING"
+    )
+
+    db.add(share)
+    db.commit()
+    db.refresh(share)
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "SHARE_COUPON",
+        f"Coupon {coupon.id}"
+    )
+
+    create_notification(
+        db,
+        receiver.id,
+        "Coupon Shared",
+        f"{current_user.name} shared a coupon with you"
+    )
+
+    return {
+        "message": "Coupon shared successfully",
+        "share_id": share.id
+    }
+
+
+# -------------------------
+# SHARED WITH ME
+# -------------------------
+
+@app.get("/shared-with-me")
+def shared_with_me(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    shares = (
+        db.query(CouponShare)
+        .filter(
+            CouponShare.receiver_id == current_user.id
+        )
+        .all()
+    )
+
+    return shares
+
+
+@app.post("/accept-share/{share_id}")
+def accept_share(
+    share_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    share = (
+        db.query(CouponShare)
+        .filter(
+            CouponShare.id == share_id,
+            CouponShare.receiver_id == current_user.id
+        )
+        .first()
+    )
+
+    if not share:
+        return {
+            "message": "Share not found"
+        }
+
+    share.status = "ACCEPTED"
+
+    db.commit()
+
+    create_notification(
+        db,
+        share.sender_id,
+        "Coupon Accepted",
+        "Your coupon was accepted"
+    )
+
+    return {
+        "message": "Share accepted"
+    }
+
+
+@app.post("/reject-share/{share_id}")
+def reject_share(
+    share_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    share = (
+        db.query(CouponShare)
+        .filter(
+            CouponShare.id == share_id,
+            CouponShare.receiver_id == current_user.id
+        )
+        .first()
+    )
+
+    if not share:
+        return {
+            "message": "Share not found"
+        }
+
+    share.status = "REJECTED"
+
+    coupon = (
+        db.query(Coupon)
+        .filter(
+            Coupon.id == share.coupon_id
+        )
+        .first()
+    )
+
+    if coupon:
+        coupon.is_shared = False
+
+    db.commit()
+
+    create_notification(
+        db,
+        share.sender_id,
+        "Coupon Rejected",
+        "Your coupon was rejected"
+    )
+
+    return {
+        "message": "Share rejected"
+    }
+
+
+@app.get("/users")
+def get_users(
+    db: Session = Depends(get_db)
+):
+    users = db.query(User).all()
+
+    return [
+        {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+            "created_at": user.created_at
+        }
+        for user in users
+    ]
+
+
+@app.get("/sent-shares")
+def get_sent_shares(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    shares = (
+        db.query(CouponShare)
+        .filter(
+            CouponShare.sender_id == current_user.id
+        )
+        .all()
+    )
+
+    results = []
+
+    for share in shares:
+
+        coupon = (
+            db.query(Coupon)
+            .filter(
+                Coupon.id == share.coupon_id
+            )
+            .first()
+        )
+
+        receiver = (
+            db.query(User)
+            .filter(
+                User.id == share.receiver_id
+            )
+            .first()
+        )
+
+        results.append({
+            "id": share.id,
+            "coupon_id": share.coupon_id,
+            "coupon_title": coupon.title if coupon else "Unknown",
+            "receiver_email": receiver.email if receiver else "Unknown",
+            "status": share.status,
+            "created_at": share.created_at,
+            "updated_at": share.updated_at
+        })
+
+    return results
+
+
+@app.get("/stats")
+def get_stats(
+    db: Session = Depends(get_db)
+):
+
+    total_users = db.query(User).count()
+
+    total_coupons = db.query(Coupon).count()
+
+    total_shares = db.query(CouponShare).count()
+
+    accepted_shares = (
+        db.query(CouponShare)
+        .filter(
+            CouponShare.status == "ACCEPTED"
+        )
+        .count()
+    )
+
+    return {
+        "total_users": total_users,
+        "total_coupons": total_coupons,
+        "total_shares": total_shares,
+        "accepted_shares": accepted_shares
+    }
+
+
+@app.get("/expiry-dashboard")
+def expiry_dashboard(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    today = date.today()
+
+    next_7_days = (
+        today +
+        timedelta(days=7)
+    )
+
+    coupons = (
+        db.query(Coupon)
+        .filter(
+            Coupon.owner_id == current_user.id
+        )
+        .all()
+    )
+
+    expiring_today = []
+    expiring_soon = []
+    expired = []
+
+    for coupon in coupons:
+
+        if not coupon.expiry_date:
+            continue
+
+        if coupon.expiry_date < today:
+
+            expired.append({
+                "id": coupon.id,
+                "title": coupon.title,
+                "expiry_date": coupon.expiry_date
+            })
+
+        elif coupon.expiry_date == today:
+
+            expiring_today.append({
+                "id": coupon.id,
+                "title": coupon.title,
+                "expiry_date": coupon.expiry_date
+            })
+
+        elif coupon.expiry_date <= next_7_days:
+
+            expiring_soon.append({
+                "id": coupon.id,
+                "title": coupon.title,
+                "expiry_date": coupon.expiry_date
+            })
+
+    return {
+        "expiring_today": expiring_today,
+        "expiring_soon": expiring_soon,
+        "expired": expired
+    }
+
+
+@app.get("/activity")
+def get_activity(
+    db: Session = Depends(get_db)
+):
+
+    coupons = db.query(Coupon).all()
+
+    activities = []
+
+    for coupon in coupons:
+
+        activities.append(
+            {
+                "type": "Coupon Created",
+                "title": coupon.title,
+                "created_at": coupon.created_at
+            }
+        )
+
+    activities.sort(
+        key=lambda x: x["created_at"],
+        reverse=True
+    )
+
+    return activities[:10]
+
+
+# -------------------------
+# PROFILE
+# -------------------------
+
+@app.get("/profile")
+def get_profile(
+    current_user: User = Depends(get_current_user)
+):
+
+    return {
+        "id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "created_at": current_user.created_at
+    }
+
+
+# -------------------------
+# UPDATE PROFILE
+# -------------------------
+
+@app.put("/profile")
+def update_profile(
+    profile: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    existing_email = (
+        db.query(User)
+        .filter(
+            User.email == profile.email,
+            User.id != current_user.id
+        )
+        .first()
+    )
+
+    if existing_email:
+
+        return {
+            "message": "Email already exists"
+        }
+
+    current_user.name = profile.name
+    current_user.email = profile.email
+
+    db.commit()
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "UPDATE_PROFILE",
+        current_user.email
+    )
+
+    return {
+        "message": "Profile updated successfully"
+    }
+
+
+# -------------------------
+# CHANGE PASSWORD
+# -------------------------
+
+@app.put("/change-password")
+def change_password(
+    request: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    valid = verify_password(
+        request.current_password,
+        current_user.password_hash
+    )
+
+    if not valid:
+
+        return {
+            "message": "Current password incorrect"
+        }
+
+    current_user.password_hash = hash_password(
+        request.new_password
+    )
+
+    db.commit()
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "CHANGE_PASSWORD",
+        "Password Updated"
+    )
+
+    return {
+        "message": "Password changed successfully"
+    }
+
+
+def verify_admin(
+    current_user: User
+):
+
+    if current_user.role != "ADMIN":
+
+        return False
+
+    return True
+
+
+@app.get("/admin/stats")
+def admin_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    if not verify_admin(current_user):
+
+        return {
+            "message": "Admin access required"
+        }
+
+    return {
+        "total_users":
+            db.query(User).count(),
+
+        "total_coupons":
+            db.query(Coupon).count(),
+
+        "total_shares":
+            db.query(CouponShare).count(),
+
+        "accepted_shares":
+            db.query(CouponShare)
+            .filter(
+                CouponShare.status == "ACCEPTED"
+            )
+            .count()
+    }
+
+
+@app.get("/admin/users")
+def admin_users(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    if not verify_admin(current_user):
+
+        return {
+            "message": "Admin access required"
+        }
+
+    users = db.query(User).all()
+
+    return [
+        {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role
+        }
+        for user in users
+    ]
+
+
+@app.get("/admin/user-coupons/{user_id}")
+def admin_user_coupons(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    if not verify_admin(current_user):
+
+        return {
+            "message": "Admin access required"
+        }
+
+    coupons = (
+        db.query(Coupon)
+        .filter(
+            Coupon.owner_id == user_id
+        )
+        .all()
+    )
+
+    return coupons
+
+
+@app.delete("/admin/user/{user_id}")
+def delete_user(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    if not verify_admin(current_user):
+
+        return {
+            "message": "Admin access required"
+        }
+
+    user = (
+        db.query(User)
+        .filter(
+            User.id == user_id
+        )
+        .first()
+    )
+
+    if not user:
+
+        return {
+            "message": "User not found"
+        }
+
+    if user.role == "ADMIN":
+
+        return {
+            "message": "Cannot delete admin user"
+        }
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "DELETE_USER",
+        user.email
+    )
+
+    db.delete(user)
+
+    db.commit()
+
+    return {
+        "message": "User deleted successfully"
+    }
+
+
+@app.get("/admin/audit-logs")
+def get_audit_logs(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    if current_user.role != "ADMIN":
+
+        return {
+            "message": "Admin only"
+        }
+
+    logs = (
+        db.query(AuditLog)
+        .order_by(
+            AuditLog.created_at.desc()
+        )
+        .limit(100)
+        .all()
+    )
+
+    return logs
+
+
+# -------------------------
+# NOTIFICATIONS
+# -------------------------
+
+@app.get("/notifications")
+def get_notifications(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    notifications = (
+        db.query(Notification)
+        .filter(
+            Notification.user_id == current_user.id
+        )
+        .order_by(
+            Notification.created_at.desc()
+        )
+        .all()
+    )
+
+    return notifications
+@app.get("/notifications/unread-count")
+def unread_count(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    count = (
+
+        db.query(Notification)
+
+        .filter(
+            Notification.user_id ==
+            current_user.id,
+
+            Notification.is_read == False
+        )
+
+        .count()
+
+    )
+
+    return {
+        "count": count
+    }
+
+
+@app.put(
+    "/notifications/read/{notification_id}"
+)
+def mark_notification_read(
+    notification_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    notification = (
+
+        db.query(Notification)
+
+        .filter(
+            Notification.id ==
+            notification_id,
+
+            Notification.user_id ==
+            current_user.id
+        )
+
+        .first()
+
+    )
+
+    if not notification:
+
+        return {
+            "message":
+            "Notification not found"
+        }
+
+    notification.is_read = True
+
+    db.commit()
+
+    return {
+        "message":
+        "Notification marked as read"
+    }
