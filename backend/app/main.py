@@ -21,6 +21,7 @@ from app.core.security import (hash_password,verify_password,create_access_token
 from app.models.user import User
 from app.models.coupon import Coupon
 from app.models.share import CouponShare
+from app.models.coupon_request import CouponRequest
 
 from app.schemas.user import UserCreate
 from app.schemas.user import UserLogin
@@ -225,9 +226,11 @@ def create_coupon(
         description=coupon.description,
         source_app=coupon.source_app,
         coupon_code=coupon.coupon_code,
+        coupon_value=coupon.coupon_value,
+        status="AVAILABLE",
         expiry_date=coupon.expiry_date,
         owner_id=current_user.id
-    )
+)
 
     db.add(new_coupon)
     db.commit()
@@ -1143,3 +1146,110 @@ def enable_user(
     return {
         "message": "User enabled successfully"
     }
+
+@app.get("/marketplace")
+def marketplace(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    coupons = (
+        db.query(Coupon)
+        .filter(
+            Coupon.status == "AVAILABLE",
+            Coupon.owner_id != current_user.id
+        )
+        .all()
+    )
+
+    return [
+        {
+            "id": coupon.id,
+            "title": coupon.title,
+            "description": coupon.description,
+            "source_app": coupon.source_app,
+            "coupon_value": coupon.coupon_value,
+            "reward_amount": (
+                coupon.coupon_value * 25
+            ) // 100,
+            "owner_id": coupon.owner_id,
+            "status": coupon.status
+        }
+        for coupon in coupons
+    ]
+
+@app.post("/request-coupon/{coupon_id}")
+def request_coupon(
+    coupon_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    coupon = (
+        db.query(Coupon)
+        .filter(
+            Coupon.id == coupon_id
+        )
+        .first()
+    )
+
+    if not coupon:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Coupon not found"
+        )
+
+    if coupon.owner_id == current_user.id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot request your own coupon"
+        )
+
+    if coupon.status != "AVAILABLE":
+
+        raise HTTPException(
+            status_code=400,
+            detail="Coupon not available"
+        )
+
+    existing_request = (
+        db.query(CouponRequest)
+        .filter(
+            CouponRequest.coupon_id == coupon.id,
+            CouponRequest.buyer_id == current_user.id,
+            CouponRequest.status == "PENDING"
+        )
+        .first()
+    )
+
+    if existing_request:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Request already exists"
+        )
+
+    request = CouponRequest(
+        coupon_id=coupon.id,
+        buyer_id=current_user.id,
+        owner_id=coupon.owner_id,
+        status="PENDING"
+    )
+
+    db.add(request)
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "REQUEST_COUPON",
+        coupon.title
+    )
+
+    db.commit()
+
+    return {
+        "message": "Coupon request submitted"
+    }
+    

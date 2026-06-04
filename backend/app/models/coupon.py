@@ -5,14 +5,10 @@ from sqlalchemy import Boolean
 from sqlalchemy import Date
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
-
 from datetime import datetime
-
 from app.database.base import Base
 
-
 class Coupon(Base):
-
     __tablename__ = "coupons"
 
     id = Column(
@@ -20,47 +16,46 @@ class Coupon(Base):
         primary_key=True,
         index=True
     )
-
     title = Column(
         String,
         nullable=False
     )
-
     description = Column(
         String,
         nullable=True
     )
-
     source_app = Column(
         String,
         nullable=False
     )
-
     coupon_code = Column(
         String,
         nullable=False
     )
-
     expiry_date = Column(
         Date,
         nullable=True
     )
-
     is_shared = Column(
         Boolean,
         default=False
     )
-
     owner_id = Column(
         Integer,
         ForeignKey("users.id")
     )
-
+    coupon_value = Column(
+        Integer,
+        default=0
+    )
+    status = Column(
+        String,
+        default="AVAILABLE"
+    )
     created_at = Column(
         DateTime,
         default=datetime.utcnow
     )
-
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
