@@ -2,11 +2,9 @@ from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import DateTime
-
+from sqlalchemy import Boolean
 from datetime import datetime
-
 from app.database.base import Base
-
 
 class User(Base):
     __tablename__ = "users"
@@ -36,6 +34,12 @@ class User(Base):
     role = Column(
         String,
         default="USER"
+    )
+
+    is_active = Column(
+        Boolean,
+        default=True,
+        nullable=False
     )
 
     created_at = Column(
