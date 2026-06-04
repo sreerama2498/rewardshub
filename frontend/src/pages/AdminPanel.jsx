@@ -25,6 +25,10 @@ export default function AdminPanel() {
   setActivityFilter] =
     useState("ALL");
 
+  const [dashboardView,
+    setDashboardView] =
+      useState("ALL");
+
   const [search, setSearch] =
     useState("");
 
@@ -289,23 +293,57 @@ export default function AdminPanel() {
 
   const filteredUsers =
 
-    users.filter(
-      (user) =>
+    users
+      .filter((user) => {
 
-        user.name
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          )
+        if (
+          dashboardView ===
+          "ADMINS"
+        ) {
+          return (
+            user.role ===
+            "ADMIN"
+          );
+        }
 
-        ||
+        if (
+          dashboardView ===
+          "ACTIVE"
+        ) {
+          return (
+            user.is_active
+          );
+        }
 
-        user.email
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          )
-    );
+        if (
+          dashboardView ===
+          "DISABLED"
+        ) {
+          return (
+            !user.is_active
+          );
+        }
+
+        return true;
+
+      })
+      .filter(
+        (user) =>
+
+          user.name
+            .toLowerCase()
+            .includes(
+              search.toLowerCase()
+            )
+
+          ||
+
+          user.email
+            .toLowerCase()
+            .includes(
+              search.toLowerCase()
+            )
+      );
 
   return (
 
@@ -323,7 +361,18 @@ export default function AdminPanel() {
 
       <div className="row mb-4">
 
-        <div className="col-md-2">
+        {/* ✅ Step 3: Total Users - clickable */}
+        <div
+          className="col-md-2"
+          onClick={() =>
+            setDashboardView(
+              "ALL"
+            )
+          }
+          style={{
+            cursor: "pointer"
+          }}
+        >
           <div className="card text-center shadow-sm">
             <div className="card-body">
               <h6>Total Users</h6>
@@ -332,7 +381,18 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="col-md-2">
+        {/* ✅ Step 3: Admins - clickable */}
+        <div
+          className="col-md-2"
+          onClick={() =>
+            setDashboardView(
+              "ADMINS"
+            )
+          }
+          style={{
+            cursor: "pointer"
+          }}
+        >
           <div className="card text-center shadow-sm">
             <div className="card-body">
               <h6>Admins</h6>
@@ -341,7 +401,18 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="col-md-2">
+        {/* ✅ Step 3: Active - clickable */}
+        <div
+          className="col-md-2"
+          onClick={() =>
+            setDashboardView(
+              "ACTIVE"
+            )
+          }
+          style={{
+            cursor: "pointer"
+          }}
+        >
           <div className="card text-center shadow-sm">
             <div className="card-body">
               <h6>Active</h6>
@@ -350,7 +421,18 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="col-md-2">
+        {/* ✅ Step 3: Disabled - clickable */}
+        <div
+          className="col-md-2"
+          onClick={() =>
+            setDashboardView(
+              "DISABLED"
+            )
+          }
+          style={{
+            cursor: "pointer"
+          }}
+        >
           <div className="card text-center shadow-sm">
             <div className="card-body">
               <h6>Disabled</h6>
@@ -403,8 +485,20 @@ export default function AdminPanel() {
 
       <div className="card p-3 mb-4">
 
+        {/* ✅ Step 4: Dynamic section title */}
         <h3>
-          Users
+          {
+            dashboardView ===
+            "ALL"
+              ? "All Users"
+              : dashboardView ===
+                "ADMINS"
+              ? "Admin Users"
+              : dashboardView ===
+                "ACTIVE"
+              ? "Active Users"
+              : "Disabled Users"
+          }
         </h3>
 
         {
@@ -441,7 +535,6 @@ export default function AdminPanel() {
 
                 </p>
 
-                {/* ✅ Added: Status display */}
                 <p>
 
                   <strong>
@@ -682,7 +775,7 @@ export default function AdminPanel() {
         <hr />
 
         {
-          filteredLogs.length === 0  // ✅ Fixed: was logs.length === 0
+          filteredLogs.length === 0
 
           ? (
 
