@@ -21,6 +21,10 @@ export default function AdminPanel() {
   const [logs, setLogs] =
     useState([]);
 
+  const [activityFilter,
+  setActivityFilter] =
+    useState("ALL");
+
   const [search, setSearch] =
     useState("");
 
@@ -31,6 +35,15 @@ export default function AdminPanel() {
   const [selectedUser,
     setSelectedUser] =
       useState(null);
+
+  const filteredLogs =
+  activityFilter === "ALL"
+    ? logs
+    : logs.filter(
+        (log) =>
+          log.category ===
+          activityFilter
+      );
 
   useEffect(() => {
 
@@ -310,46 +323,56 @@ export default function AdminPanel() {
 
       <div className="row mb-4">
 
-        <div className="col-md-3">
-          <div className="card text-center">
+        <div className="col-md-2">
+          <div className="card text-center shadow-sm">
             <div className="card-body">
-              <h5>Users</h5>
-              <h2>
-                {stats?.total_users}
-              </h2>
+              <h6>Total Users</h6>
+              <h3>{stats?.total_users}</h3>
             </div>
           </div>
         </div>
 
-        <div className="col-md-3">
-          <div className="card text-center">
+        <div className="col-md-2">
+          <div className="card text-center shadow-sm">
             <div className="card-body">
-              <h5>Coupons</h5>
-              <h2>
-                {stats?.total_coupons}
-              </h2>
+              <h6>Admins</h6>
+              <h3>{stats?.admin_users}</h3>
             </div>
           </div>
         </div>
 
-        <div className="col-md-3">
-          <div className="card text-center">
+        <div className="col-md-2">
+          <div className="card text-center shadow-sm">
             <div className="card-body">
-              <h5>Shares</h5>
-              <h2>
-                {stats?.total_shares}
-              </h2>
+              <h6>Active</h6>
+              <h3>{stats?.active_users}</h3>
             </div>
           </div>
         </div>
 
-        <div className="col-md-3">
-          <div className="card text-center">
+        <div className="col-md-2">
+          <div className="card text-center shadow-sm">
             <div className="card-body">
-              <h5>Accepted</h5>
-              <h2>
-                {stats?.accepted_shares}
-              </h2>
+              <h6>Disabled</h6>
+              <h3>{stats?.disabled_users}</h3>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-2">
+          <div className="card text-center shadow-sm">
+            <div className="card-body">
+              <h6>Coupons</h6>
+              <h3>{stats?.total_coupons}</h3>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-2">
+          <div className="card text-center shadow-sm">
+            <div className="card-body">
+              <h6>Shares</h6>
+              <h3>{stats?.total_shares}</h3>
             </div>
           </div>
         </div>
@@ -415,6 +438,23 @@ export default function AdminPanel() {
                   {" "}
 
                   {user.role}
+
+                </p>
+
+                {/* ✅ Added: Status display */}
+                <p>
+
+                  <strong>
+                    Status:
+                  </strong>
+
+                  {" "}
+
+                  {
+                    user.is_active
+                      ? "🟢 Active"
+                      : "🔴 Disabled"
+                  }
 
                 </p>
 
@@ -583,6 +623,48 @@ export default function AdminPanel() {
         )
       }
 
+      {/* Audit Logs - Filter */}
+
+      <div className="card p-3 mb-3">
+
+        <h5>
+          Activity Filter
+        </h5>
+
+        <select
+          className="form-select"
+          value={activityFilter}
+          onChange={(e) =>
+            setActivityFilter(
+              e.target.value
+            )
+          }
+        >
+
+          <option value="ALL">
+            All Activities
+          </option>
+
+          <option value="AUTH">
+            Authentication
+          </option>
+
+          <option value="COUPON">
+            Coupons
+          </option>
+
+          <option value="ADMIN">
+            Admin
+          </option>
+
+          <option value="OTHER">
+            Other
+          </option>
+
+        </select>
+
+      </div>
+
       {/* Audit Logs */}
 
       <div
@@ -600,7 +682,7 @@ export default function AdminPanel() {
         <hr />
 
         {
-          logs.length === 0
+          filteredLogs.length === 0  // ✅ Fixed: was logs.length === 0
 
           ? (
 
@@ -612,7 +694,7 @@ export default function AdminPanel() {
 
           : (
 
-              logs.map(
+              filteredLogs.map(
                 (log) => (
 
                   <div
@@ -624,6 +706,24 @@ export default function AdminPanel() {
                       mb-3
                     "
                   >
+
+                    <div className="mb-2">
+
+                      <span
+                        className={
+                          log.category === "AUTH"
+                            ? "badge bg-primary"
+                            : log.category === "COUPON"
+                            ? "badge bg-warning text-dark"
+                            : log.category === "ADMIN"
+                            ? "badge bg-danger"
+                            : "badge bg-secondary"
+                        }
+                      >
+                        {log.category}
+                      </span>
+
+                    </div>
 
                     <h6>
                       {log.action}

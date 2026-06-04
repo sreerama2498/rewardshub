@@ -731,6 +731,9 @@ def change_password(
         "message": "Password changed successfully"
     }
 
+#--------------------------
+#	Admin
+#--------------------------
 
 def verify_admin(
     current_user: User
@@ -745,7 +748,6 @@ def verify_admin(
 
     return True
 
-
 @app.get("/admin/stats")
 def admin_stats(
     current_user: User = Depends(get_current_user),
@@ -754,24 +756,53 @@ def admin_stats(
 
     verify_admin(current_user)
 
+    total_users = db.query(User).count()
+
+    admin_users = (
+        db.query(User)
+        .filter(User.role == "ADMIN")
+        .count()
+    )
+
+    active_users = (
+        db.query(User)
+        .filter(User.is_active == True)
+        .count()
+    )
+
+    disabled_users = (
+        db.query(User)
+        .filter(User.is_active == False)
+        .count()
+    )
+
+    total_coupons = (
+        db.query(Coupon)
+        .count()
+    )
+
+    total_shares = (
+        db.query(CouponShare)
+        .count()
+    )
+
+    accepted_shares = (
+        db.query(CouponShare)
+        .filter(
+            CouponShare.status == "ACCEPTED"
+        )
+        .count()
+    )
+
     return {
-        "total_users":
-            db.query(User).count(),
-
-        "total_coupons":
-            db.query(Coupon).count(),
-
-        "total_shares":
-            db.query(CouponShare).count(),
-
-        "accepted_shares":
-            db.query(CouponShare)
-            .filter(
-                CouponShare.status == "ACCEPTED"
-            )
-            .count()
+        "total_users": total_users,
+        "admin_users": admin_users,
+        "active_users": active_users,
+        "disabled_users": disabled_users,
+        "total_coupons": total_coupons,
+        "total_shares": total_shares,
+        "accepted_shares": accepted_shares
     }
-
 
 @app.get("/admin/users")
 def admin_users(
@@ -788,7 +819,8 @@ def admin_users(
             "id": user.id,
             "name": user.name,
             "email": user.email,
-            "role": user.role
+            "role": user.role,
+            "is_active": user.is_active
         }
         for user in users
     ]
@@ -878,18 +910,50 @@ def delete_user(
     }
 
 
+def get_activity_category(action):
+    auth_actions = [
+        "LOGIN",
+        "REGISTER",
+        "PASSWORD_CHANGE"
+    ]
+
+    coupon_actions = [
+        "CREATE_COUPON",
+        "UPDATE_COUPON",
+        "DELETE_COUPON",
+        "SHARE_COUPON"
+    ]
+
+    admin_actions = [
+        "DELETE_USER",
+        "DISABLE_USER",
+        "ENABLE_USER",
+        "MAKE_ADMIN",
+        "REMOVE_ADMIN"
+    ]
+
+    if action in auth_actions:
+        return "AUTH"
+
+    if action in coupon_actions:
+        return "COUPON"
+
+    if action in admin_actions:
+        return "ADMIN"
+
+    return "OTHER"
+
+
 @app.get("/admin/audit-logs")
 def get_audit_logs(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-
     if current_user.role != "ADMIN":
         raise HTTPException(
             status_code=403,
             detail="Admin only"
         )
-
     logs = (
         db.query(AuditLog)
         .order_by(
@@ -898,8 +962,19 @@ def get_audit_logs(
         .limit(100)
         .all()
     )
-
-    return logs
+    return [
+        {
+            "id": log.id,
+            "user_id": log.user_id,
+            "action": log.action,
+            "details": log.details,
+            "created_at": log.created_at,
+            "category": get_activity_category(
+                log.action
+            )
+        }
+        for log in logs
+    ]
 
 
 # -------------------------
