@@ -14,7 +14,7 @@ import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import AdminPanel from "./pages/AdminPanel";
 import Notifications from "./pages/Notifications";
-
+import Marketplace from "./pages/Marketplace";
 import ProtectedRoute
   from "./routes/ProtectedRoute";
 
@@ -107,7 +107,14 @@ function App() {
             </ProtectedRoute>
           }
         />
-
+<Route
+  path="/marketplace"
+  element={
+    <ProtectedRoute>
+      <Marketplace />
+    </ProtectedRoute>
+  }
+/>
       </Routes>
 
     </BrowserRouter>

@@ -48,7 +48,14 @@ export default function Navbar() {
         >
           Coupons
         </button>
-
+<button
+  className="btn btn-outline-light me-2"
+  onClick={() =>
+    navigate("/marketplace")
+  }
+>
+  Marketplace
+</button>
         <button
           className="btn btn-outline-light me-2"
           onClick={() =>

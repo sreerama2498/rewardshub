@@ -18,7 +18,12 @@ export default function MyCoupons() {
   const [description, setDescription] = useState("");
   const [sourceApp, setSourceApp] = useState("");
   const [couponCode, setCouponCode] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
+
+const [couponValue,
+  setCouponValue] =
+    useState("");
+
+const [expiryDate, setExpiryDate] = useState("");
 
   const [receiverEmail, setReceiverEmail] =
     useState("");
@@ -78,6 +83,8 @@ export default function MyCoupons() {
           description,
           source_app: sourceApp,
           coupon_code: couponCode,
+          coupon_value:
+          parseInt(couponValue),
           expiry_date: expiryDate
         },
         {
@@ -257,7 +264,16 @@ export default function MyCoupons() {
             )
           }
         />
-
+<input
+  type="number"
+  className="form-control mb-2"
+  placeholder="Coupon Value (₹)"
+  onChange={(e) =>
+    setCouponValue(
+      e.target.value
+    )
+  }
+/>
         <input
           type="date"
           className="form-control mb-3"
@@ -401,7 +417,37 @@ export default function MyCoupons() {
                       }
 
                     </p>
+                     
+                    <p>
 
+  <strong>
+    Value:
+  </strong>
+
+  {" "}
+
+  ₹{
+    coupon.coupon_value
+      || 0
+  }
+
+</p>
+
+<p>
+
+  <strong>
+    Status:
+  </strong>
+
+  {" "}
+
+  {
+    coupon.status
+      || "AVAILABLE"
+  }
+
+</p> 
+                    
                     <p>
 
                       <strong>
