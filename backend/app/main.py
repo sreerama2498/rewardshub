@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi import Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.schemas.profile import (ProfileUpdate,PasswordChange)
 from app.database.connection import engine
 from app.database.base import Base
@@ -157,6 +158,12 @@ def login(
         return {
             "message": "Invalid credentials"
         }
+
+    if not existing_user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="Account disabled"
+        )
 
     valid = verify_password(
         user.password,
@@ -613,7 +620,7 @@ def get_activity(
             {
                 "type": "Coupon Created",
                 "title": coupon.title,
-                "created_at": coupon.created_date
+                "created_at": coupon.created_at
             }
         )
 
@@ -745,11 +752,7 @@ def admin_stats(
     db: Session = Depends(get_db)
 ):
 
-    if not verify_admin(current_user):
-
-        return {
-            "message": "Admin access required"
-        }
+    verify_admin(current_user)
 
     return {
         "total_users":
@@ -776,11 +779,7 @@ def admin_users(
     db: Session = Depends(get_db)
 ):
 
-    if not verify_admin(current_user):
-
-        return {
-            "message": "Admin access required"
-        }
+    verify_admin(current_user)
 
     users = db.query(User).all()
 
@@ -802,11 +801,7 @@ def admin_user_coupons(
     db: Session = Depends(get_db)
 ):
 
-    if not verify_admin(current_user):
-
-        return {
-            "message": "Admin access required"
-        }
+    verify_admin(current_user)
 
     coupons = (
         db.query(Coupon)
@@ -826,11 +821,7 @@ def delete_user(
     db: Session = Depends(get_db)
 ):
 
-    if not verify_admin(current_user):
-
-        return {
-            "message": "Admin access required"
-        }
+    verify_admin(current_user)
 
     user = (
         db.query(User)
@@ -842,21 +833,40 @@ def delete_user(
 
     if not user:
 
-        return {
-            "message": "User not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    if user.id == current_user.id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete yourself"
+        )
 
     if user.role == "ADMIN":
 
-        return {
-            "message": "Cannot delete admin user"
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete admin user"
+        )
 
     create_audit_log(
         db,
         current_user.id,
         "DELETE_USER",
         user.email
+    )
+
+    db.execute(
+        text(
+            "DELETE FROM audit_logs "
+            "WHERE user_id = :user_id"
+        ),
+        {
+            "user_id": user_id
+        }
     )
 
     db.delete(user)
@@ -914,6 +924,8 @@ def get_notifications(
     )
 
     return notifications
+
+
 @app.get("/notifications/unread-count")
 def unread_count(
     current_user: User = Depends(get_current_user),
@@ -921,18 +933,12 @@ def unread_count(
 ):
 
     count = (
-
         db.query(Notification)
-
         .filter(
-            Notification.user_id ==
-            current_user.id,
-
+            Notification.user_id == current_user.id,
             Notification.is_read == False
         )
-
         .count()
-
     )
 
     return {
@@ -950,26 +956,18 @@ def mark_notification_read(
 ):
 
     notification = (
-
         db.query(Notification)
-
         .filter(
-            Notification.id ==
-            notification_id,
-
-            Notification.user_id ==
-            current_user.id
+            Notification.id == notification_id,
+            Notification.user_id == current_user.id
         )
-
         .first()
-
     )
 
     if not notification:
 
         return {
-            "message":
-            "Notification not found"
+            "message": "Notification not found"
         }
 
     notification.is_read = True
@@ -977,6 +975,96 @@ def mark_notification_read(
     db.commit()
 
     return {
-        "message":
-        "Notification marked as read"
+        "message": "Notification marked as read"
+    }
+
+
+# -------------------------
+# DISABLE USER
+# -------------------------
+
+@app.put("/admin/user/{user_id}/disable")
+def disable_user(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    verify_admin(current_user)
+
+    user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .first()
+    )
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    if user.id == current_user.id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot disable yourself"
+        )
+
+    user.is_active = False
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "DISABLE_USER",
+        user.email
+    )
+
+    db.commit()
+
+    return {
+        "message": "User disabled successfully"
+    }
+
+
+# -------------------------
+# ENABLE USER
+# -------------------------
+
+@app.put("/admin/user/{user_id}/enable")
+def enable_user(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    verify_admin(current_user)
+
+    user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .first()
+    )
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    user.is_active = True
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "ENABLE_USER",
+        user.email
+    )
+
+    db.commit()
+
+    return {
+        "message": "User enabled successfully"
     }

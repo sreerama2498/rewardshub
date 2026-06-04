@@ -67,10 +67,10 @@ export default function AdminPanel() {
         );
 
       setUsers(
-  Array.isArray(usersResponse.data)
-    ? usersResponse.data
-    : []
-);
+        Array.isArray(usersResponse.data)
+          ? usersResponse.data
+          : []
+      );
 
       const logsResponse =
         await api.get(
@@ -79,10 +79,10 @@ export default function AdminPanel() {
         );
 
       setLogs(
-  Array.isArray(logsResponse.data)
-    ? logsResponse.data
-    : []
-);
+        Array.isArray(logsResponse.data)
+          ? logsResponse.data
+          : []
+      );
 
     } catch (error) {
 
@@ -184,6 +184,84 @@ export default function AdminPanel() {
 
       toast.error(
         "Delete Failed"
+      );
+
+    }
+
+  };
+
+  const disableUser = async (
+    userId
+  ) => {
+
+    try {
+
+      const token =
+        localStorage.getItem("token");
+
+      const response =
+        await api.put(
+          `/admin/user/${userId}/disable`,
+          {},
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`
+            }
+          }
+        );
+
+      toast.success(
+        response.data.message
+      );
+
+      loadAdminData();
+
+    } catch (error) {
+
+      console.log(error);
+
+      toast.error(
+        "Disable Failed"
+      );
+
+    }
+
+  };
+
+  const enableUser = async (
+    userId
+  ) => {
+
+    try {
+
+      const token =
+        localStorage.getItem("token");
+
+      const response =
+        await api.put(
+          `/admin/user/${userId}/enable`,
+          {},
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`
+            }
+          }
+        );
+
+      toast.success(
+        response.data.message
+      );
+
+      loadAdminData();
+
+    } catch (error) {
+
+      console.log(error);
+
+      toast.error(
+        "Enable Failed"
       );
 
     }
@@ -360,19 +438,59 @@ export default function AdminPanel() {
                   user.role !==
                   "ADMIN" && (
 
-                    <button
-                      className="
-                        btn
-                        btn-danger
-                      "
-                      onClick={() =>
-                        deleteUser(
-                          user.id
-                        )
-                      }
-                    >
-                      Delete User
-                    </button>
+                    <>
+
+                      {user.is_active ? (
+
+                        <button
+                          className="
+                            btn
+                            btn-warning
+                            me-2
+                          "
+                          onClick={() =>
+                            disableUser(
+                              user.id
+                            )
+                          }
+                        >
+                          Disable User
+                        </button>
+
+                      ) : (
+
+                        <button
+                          className="
+                            btn
+                            btn-success
+                            me-2
+                          "
+                          onClick={() =>
+                            enableUser(
+                              user.id
+                            )
+                          }
+                        >
+                          Enable User
+                        </button>
+
+                      )}
+
+                      <button
+                        className="
+                          btn
+                          btn-danger
+                        "
+                        onClick={() =>
+                          deleteUser(
+                            user.id
+                          )
+                        }
+                      >
+                        Delete User
+                      </button>
+
+                    </>
 
                   )
                 }
