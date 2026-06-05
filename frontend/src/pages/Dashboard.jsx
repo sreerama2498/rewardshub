@@ -3,12 +3,18 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import ExpiryDashboard from "../components/ExpiryDashboard";
+import Modal from "react-bootstrap/Modal";
 
 export default function Dashboard() {
 
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
   const [activities, setActivities] = useState([]);
+
+  const [showModal, setShowModal] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalData, setModalData] = useState([]);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -87,6 +93,68 @@ export default function Dashboard() {
 
   }, []);
 
+  // ✅ Updated with debug logs
+  const openStatsModal = async (
+    type,
+    title
+  ) => {
+
+    console.log(
+      "CLICKED:",
+      type
+    );
+
+    setModalTitle(title);
+    setModalData([]);
+    setModalLoading(true);
+    setShowModal(true);
+
+    try {
+
+      const token =
+        localStorage.getItem("token");
+
+      console.log(
+        "Calling:",
+        `/stats/${type}`
+      );
+
+      const response =
+        await api.get(
+          `/stats/${type}`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`
+            }
+          }
+        );
+
+      console.log(
+        "Response:",
+        response.data
+      );
+
+      setModalData(
+        Array.isArray(response.data)
+          ? response.data
+          : []
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+      setModalData([]);
+
+    } finally {
+
+      setModalLoading(false);
+
+    }
+
+  };
+
   if (!user) {
     return <h2>Loading...</h2>;
   }
@@ -126,27 +194,22 @@ export default function Dashboard() {
 
       <div className="row mb-4">
 
-        {/* ✅ Total Users - clickable */}
         <div className="col-md-3 mb-3">
 
           <div
             className="card text-center shadow-sm"
-            style={{
-              cursor: "pointer"
-            }}
-            onClick={() => {
-              alert("Users clicked");
-            }}
+            style={{ cursor: "pointer" }}
+            onClick={() =>
+              openStatsModal(
+                "users",
+                "Total Users"
+              )
+            }
           >
 
             <div className="card-body">
-
               <h5>Total Users</h5>
-
-              <h2>
-                {stats?.total_users || 0}
-              </h2>
-
+              <h2>{stats?.total_users || 0}</h2>
             </div>
 
           </div>
@@ -155,16 +218,20 @@ export default function Dashboard() {
 
         <div className="col-md-3 mb-3">
 
-          <div className="card text-center shadow-sm">
+          <div
+            className="card text-center shadow-sm"
+            style={{ cursor: "pointer" }}
+            onClick={() =>
+              openStatsModal(
+                "coupons",
+                "Coupons"
+              )
+            }
+          >
 
             <div className="card-body">
-
               <h5>Coupons</h5>
-
-              <h2>
-                {stats?.total_coupons || 0}
-              </h2>
-
+              <h2>{stats?.total_coupons || 0}</h2>
             </div>
 
           </div>
@@ -173,16 +240,20 @@ export default function Dashboard() {
 
         <div className="col-md-3 mb-3">
 
-          <div className="card text-center shadow-sm">
+          <div
+            className="card text-center shadow-sm"
+            style={{ cursor: "pointer" }}
+            onClick={() =>
+              openStatsModal(
+                "shares",
+                "Shares"
+              )
+            }
+          >
 
             <div className="card-body">
-
               <h5>Shares</h5>
-
-              <h2>
-                {stats?.total_shares || 0}
-              </h2>
-
+              <h2>{stats?.total_shares || 0}</h2>
             </div>
 
           </div>
@@ -191,16 +262,20 @@ export default function Dashboard() {
 
         <div className="col-md-3 mb-3">
 
-          <div className="card text-center shadow-sm">
+          <div
+            className="card text-center shadow-sm"
+            style={{ cursor: "pointer" }}
+            onClick={() =>
+              openStatsModal(
+                "accepted",
+                "Accepted Shares"
+              )
+            }
+          >
 
             <div className="card-body">
-
               <h5>Accepted</h5>
-
-              <h2>
-                {stats?.accepted_shares || 0}
-              </h2>
-
+              <h2>{stats?.accepted_shares || 0}</h2>
             </div>
 
           </div>
@@ -310,6 +385,89 @@ export default function Dashboard() {
         </button>
 
       </div>
+
+      {/* Stats Modal */}
+      <Modal
+        show={showModal}
+        onHide={() =>
+          setShowModal(false)
+        }
+        size="lg"
+      >
+
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {modalTitle}
+          </Modal.Title>
+        </Modal.Header>
+
+        <Modal.Body>
+
+          {
+            modalLoading ? (
+
+              <p>Loading...</p>
+
+            ) : modalData.length === 0 ? (
+
+              <p>No records found.</p>
+
+            ) : (
+
+              <div
+                className="table-responsive"
+              >
+
+                <table
+                  className="table table-bordered table-striped"
+                >
+
+                  <thead
+                    className="table-dark"
+                  >
+                    <tr>
+                      {
+                        Object.keys(
+                          modalData[0]
+                        ).map(key => (
+                          <th key={key}>
+                            {key}
+                          </th>
+                        ))
+                      }
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {
+                      modalData.map(
+                        (row, index) => (
+                          <tr key={index}>
+                            {
+                              Object.values(row).map(
+                                (value, idx) => (
+                                  <td key={idx}>
+                                    {String(value ?? "")}
+                                  </td>
+                                )
+                              )
+                            }
+                          </tr>
+                        )
+                      )
+                    }
+                  </tbody>
+
+                </table>
+
+              </div>
+
+            )
+          }
+
+        </Modal.Body>
+
+      </Modal>
 
     </div>
   );
