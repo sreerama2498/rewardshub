@@ -2,22 +2,10 @@ import { useEffect, useState } from "react";
 
 import api from "../services/api";
 
-import Modal from "react-bootstrap/Modal";
-
 export default function ExpiryDashboard() {
 
   const [data, setData] =
     useState(null);
-
-  // ✅ Modal state variables
-  const [showModal, setShowModal] =
-    useState(false);
-
-  const [modalTitle, setModalTitle] =
-    useState("");
-
-  const [modalCoupons, setModalCoupons] =
-    useState([]);
 
   useEffect(() => {
 
@@ -58,22 +46,6 @@ export default function ExpiryDashboard() {
 
   };
 
-  // ✅ openModal function
-  const openModal = (
-    title,
-    coupons
-  ) => {
-
-    setModalTitle(title);
-
-    setModalCoupons(
-      coupons
-    );
-
-    setShowModal(true);
-
-  };
-
   if (!data) {
 
     return null;
@@ -98,7 +70,6 @@ export default function ExpiryDashboard() {
 
       <div className="row">
 
-        {/* ✅ Expiring Today - clickable */}
         <div className="col-md-4">
 
           <div
@@ -106,15 +77,6 @@ export default function ExpiryDashboard() {
               alert
               alert-warning
             "
-            style={{
-              cursor: "pointer"
-            }}
-            onClick={() =>
-              openModal(
-                "Expiring Today",
-                data.expiring_today
-              )
-            }
           >
 
             <h5>
@@ -132,7 +94,6 @@ export default function ExpiryDashboard() {
 
         </div>
 
-        {/* ✅ Expiring Soon - clickable */}
         <div className="col-md-4">
 
           <div
@@ -140,15 +101,6 @@ export default function ExpiryDashboard() {
               alert
               alert-info
             "
-            style={{
-              cursor: "pointer"
-            }}
-            onClick={() =>
-              openModal(
-                "Next 7 Days",
-                data.expiring_soon
-              )
-            }
           >
 
             <h5>
@@ -166,7 +118,6 @@ export default function ExpiryDashboard() {
 
         </div>
 
-        {/* ✅ Expired - clickable */}
         <div className="col-md-4">
 
           <div
@@ -174,15 +125,6 @@ export default function ExpiryDashboard() {
               alert
               alert-danger
             "
-            style={{
-              cursor: "pointer"
-            }}
-            onClick={() =>
-              openModal(
-                "Expired",
-                data.expired
-              )
-            }
           >
 
             <h5>
@@ -321,89 +263,6 @@ export default function ExpiryDashboard() {
 
         )
       }
-
-      {/* ✅ Modal */}
-      <Modal
-        show={showModal}
-        onHide={() =>
-          setShowModal(false)
-        }
-        size="lg"
-      >
-
-        <Modal.Header closeButton>
-
-          <Modal.Title>
-            {modalTitle}
-          </Modal.Title>
-
-        </Modal.Header>
-
-        <Modal.Body>
-
-          {
-            modalCoupons.length === 0 ? (
-
-              <p>
-                No coupons found
-              </p>
-
-            ) : (
-
-              modalCoupons.map(
-                coupon => (
-
-                  <div
-                    key={coupon.id}
-                    className="
-                      border
-                      rounded
-                      p-2
-                      mb-2
-                    "
-                  >
-
-                    <h6>
-                      {coupon.title}
-                    </h6>
-
-                    <p className="mb-0">
-                      <strong>
-                        Code:
-                      </strong>
-
-                      {" "}
-
-                      {coupon.coupon_code}
-                    </p>
-
-                    <small
-                      className="text-muted"
-                    >
-                      <strong>
-                        Expires:
-                      </strong>
-
-                      {" "}
-
-                      {
-                        coupon.expiry_date
-                          ? coupon.expiry_date
-                          : "No expiry date"
-                      }
-                    </small>
-
-                  </div>
-
-                )
-              )
-
-            )
-          }
-
-        </Modal.Body>
-
-      </Modal>
 
     </div>
 
