@@ -76,7 +76,7 @@ ACTION_META = {
 
     # Auth
     "LOGIN":             ("USER",    "User Login"),
-    "REGISTER":          ("USER",    "User Registered"),
+    "USER_REGISTERED":   ("USER",    "User Registered"),
     "PASSWORD_CHANGE":   ("USER",    "Password Changed"),
 
     # Coupon

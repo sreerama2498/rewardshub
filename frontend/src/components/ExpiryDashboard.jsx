@@ -2,10 +2,21 @@ import { useEffect, useState } from "react";
 
 import api from "../services/api";
 
+import Modal from "react-bootstrap/Modal";
+
 export default function ExpiryDashboard() {
 
   const [data, setData] =
     useState(null);
+
+  const [showModal, setShowModal] =
+    useState(false);
+
+  const [modalTitle, setModalTitle] =
+    useState("");
+
+  const [modalCoupons, setModalCoupons] =
+    useState([]);
 
   useEffect(() => {
 
@@ -46,6 +57,19 @@ export default function ExpiryDashboard() {
 
   };
 
+  const openModal = (
+    title,
+    coupons
+  ) => {
+
+    setModalTitle(title);
+
+    setModalCoupons(coupons);
+
+    setShowModal(true);
+
+  };
+
   if (!data) {
 
     return null;
@@ -70,73 +94,94 @@ export default function ExpiryDashboard() {
 
       <div className="row">
 
+        {/* ✅ Expiring Today - updated */}
         <div className="col-md-4">
 
           <div
-            className="
-              alert
-              alert-warning
-            "
-          >
-
-            <h5>
-              Expiring Today
-            </h5>
-
-            <h2>
-              {
+            className="alert alert-warning text-center shadow-sm"
+            style={{
+              cursor: "pointer",
+              transition: "0.2s"
+            }}
+            onClick={() =>
+              openModal(
+                "Expiring Today",
                 data.expiring_today
-                  .length
-              }
+              )
+            }
+          >
+
+            <h5>Expiring Today</h5>
+
+            <h2>
+              {data.expiring_today.length}
             </h2>
+
+            <p className="mb-0">
+              Click to view details
+            </p>
 
           </div>
 
         </div>
 
+        {/* ✅ Next 7 Days - updated */}
         <div className="col-md-4">
 
           <div
-            className="
-              alert
-              alert-info
-            "
-          >
-
-            <h5>
-              Next 7 Days
-            </h5>
-
-            <h2>
-              {
+            className="alert alert-info text-center shadow-sm"
+            style={{
+              cursor: "pointer",
+              transition: "0.2s"
+            }}
+            onClick={() =>
+              openModal(
+                "Next 7 Days",
                 data.expiring_soon
-                  .length
-              }
+              )
+            }
+          >
+
+            <h5>Next 7 Days</h5>
+
+            <h2>
+              {data.expiring_soon.length}
             </h2>
+
+            <p className="mb-0">
+              Click to view details
+            </p>
 
           </div>
 
         </div>
 
+        {/* ✅ Expired - updated */}
         <div className="col-md-4">
 
           <div
-            className="
-              alert
-              alert-danger
-            "
+            className="alert alert-danger text-center shadow-sm"
+            style={{
+              cursor: "pointer",
+              transition: "0.2s"
+            }}
+            onClick={() =>
+              openModal(
+                "Expired Coupons",
+                data.expired
+              )
+            }
           >
 
-            <h5>
-              Expired
-            </h5>
+            <h5>Expired</h5>
 
             <h2>
-              {
-                data.expired
-                  .length
-              }
+              {data.expired.length}
             </h2>
+
+            <p className="mb-0">
+              Click to view details
+            </p>
 
           </div>
 
@@ -144,125 +189,78 @@ export default function ExpiryDashboard() {
 
       </div>
 
-      {
-        data.expiring_today
-          .length > 0 && (
+      {/* ✅ Expiry Modal with table */}
+      <Modal
+        show={showModal}
+        onHide={() =>
+          setShowModal(false)
+        }
+        size="lg"
+      >
 
-          <>
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {modalTitle}
+          </Modal.Title>
+        </Modal.Header>
 
-            <h5>
-              Expiring Today
-            </h5>
+        <Modal.Body>
 
-            {
-              data.expiring_today
-                .map(
-                  coupon => (
+          {
+            modalCoupons.length === 0 ? (
 
-                    <p
-                      key={
-                        coupon.id
-                      }
-                    >
+              <p>No coupons found.</p>
 
-                      ⚠️
+            ) : (
 
-                      {" "}
+              <div className="table-responsive">
 
-                      {
-                        coupon.title
-                      }
+                <table
+                  className="table table-striped table-bordered"
+                >
 
-                    </p>
+                  <thead className="table-dark">
 
-                  )
-                )
-            }
+                    <tr>
+                      <th>ID</th>
+                      <th>Coupon Title</th>
+                      <th>Expiry Date</th>
+                    </tr>
 
-          </>
+                  </thead>
 
-        )
-      }
+                  <tbody>
 
-      {
-        data.expiring_soon
-          .length > 0 && (
+                    {
+                      modalCoupons.map(
+                        coupon => (
 
-          <>
+                          <tr key={coupon.id}>
 
-            <h5>
-              Expiring Within 7 Days
-            </h5>
+                            <td>{coupon.id}</td>
 
-            {
-              data.expiring_soon
-                .map(
-                  coupon => (
+                            <td>{coupon.title}</td>
 
-                    <p
-                      key={
-                        coupon.id
-                      }
-                    >
+                            <td>{coupon.expiry_date}</td>
 
-                      📅
+                          </tr>
 
-                      {" "}
+                        )
+                      )
+                    }
 
-                      {
-                        coupon.title
-                      }
+                  </tbody>
 
-                    </p>
+                </table>
 
-                  )
-                )
-            }
+              </div>
 
-          </>
+            )
+          }
 
-        )
-      }
+        </Modal.Body>
 
-      {
-        data.expired
-          .length > 0 && (
-
-          <>
-
-            <h5>
-              Expired Coupons
-            </h5>
-
-            {
-              data.expired
-                .map(
-                  coupon => (
-
-                    <p
-                      key={
-                        coupon.id
-                      }
-                    >
-
-                      ❌
-
-                      {" "}
-
-                      {
-                        coupon.title
-                      }
-
-                    </p>
-
-                  )
-                )
-            }
-
-          </>
-
-        )
-      }
+      </Modal>
 
     </div>
 
