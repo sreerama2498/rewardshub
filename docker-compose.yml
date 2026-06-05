@@ -1,69 +1,56 @@
 services:
-
   postgres:
-
     image: postgres:16
-
     container_name: rewardshub-postgres
-
+    restart: unless-stopped
     environment:
       POSTGRES_DB: rewardshub
       POSTGRES_USER: rewarduser
       POSTGRES_PASSWORD: rewardpass
       TZ: Asia/Kolkata
-
     ports:
       - "5432:5432"
-
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
-
     build:
       context: ./backend
-
     container_name: rewardshub-backend
-
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://rewarduser:rewardpass@postgres:5432/rewardshub
       TZ: Asia/Kolkata
     depends_on:
       - postgres
-
     expose:
       - "8000"
 
   frontend:
-
     build:
       context: ./frontend
-
     container_name: rewardshub-frontend
+    restart: unless-stopped
     environment:
       TZ: Asia/Kolkata
     depends_on:
       - backend
-
-    ports:
-      - "5173:5173"
-
+    expose:
+    - "80"
+      
   nginx:
-
     build:
       context: ./nginx
-
     container_name: rewardshub-nginx
+    restart: unless-stopped
     environment:
       TZ: Asia/Kolkata
     depends_on:
       - frontend
       - backend
-
     ports:
       - "80:80"
       - "443:443"
-
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
 
