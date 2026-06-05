@@ -10,6 +10,7 @@ services:
       POSTGRES_DB: rewardshub
       POSTGRES_USER: rewarduser
       POSTGRES_PASSWORD: rewardpass
+      TZ: Asia/Kolkata
 
     ports:
       - "5432:5432"
@@ -26,7 +27,7 @@ services:
 
     environment:
       DATABASE_URL: postgresql://rewarduser:rewardpass@postgres:5432/rewardshub
-
+      TZ: Asia/Kolkata
     depends_on:
       - postgres
 
@@ -39,7 +40,8 @@ services:
       context: ./frontend
 
     container_name: rewardshub-frontend
-
+    environment:
+      TZ: Asia/Kolkata
     depends_on:
       - backend
 
@@ -52,7 +54,8 @@ services:
       context: ./nginx
 
     container_name: rewardshub-nginx
-
+    environment:
+      TZ: Asia/Kolkata
     depends_on:
       - frontend
       - backend
