@@ -546,6 +546,82 @@ def get_stats(
         "accepted_shares": accepted_shares
     }
 
+@app.get("/stats/users")
+def stats_users(
+    db: Session = Depends(get_db)
+):
+    users = db.query(User).all()
+
+    return [
+        {
+            "ID": user.id,
+            "Name": user.name,
+            "Email": user.email,
+            "Role": user.role,
+            "Active": user.is_active
+        }
+        for user in users
+    ]
+
+
+@app.get("/stats/coupons")
+def stats_coupons(
+    db: Session = Depends(get_db)
+):
+    coupons = db.query(Coupon).all()
+
+    return [
+        {
+            "ID": coupon.id,
+            "Title": coupon.title,
+            "Source": coupon.source_app,
+            "Status": coupon.status,
+            "Value": coupon.coupon_value,
+            "Expiry": coupon.expiry_date
+        }
+        for coupon in coupons
+    ]
+
+
+@app.get("/stats/shares")
+def stats_shares(
+    db: Session = Depends(get_db)
+):
+    shares = db.query(CouponShare).all()
+
+    return [
+        {
+            "ID": share.id,
+            "Coupon ID": share.coupon_id,
+            "Receiver ID": share.receiver_id,
+            "Status": share.status,
+            "Created": share.created_at
+        }
+        for share in shares
+    ]
+
+
+@app.get("/stats/accepted")
+def stats_accepted(
+    db: Session = Depends(get_db)
+):
+    shares = (
+        db.query(CouponShare)
+        .filter(
+            CouponShare.status == "ACCEPTED"
+        )
+        .all()
+    )
+
+    return [
+        {
+            "ID": share.id,
+            "Coupon ID": share.coupon_id,
+            "Receiver ID": share.receiver_id,
+            "Accepted": share.updated_at
+        }
+        for share in shares
+    ]
 
 @app.get("/expiry-dashboard")
 def expiry_dashboard(
