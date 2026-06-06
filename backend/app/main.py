@@ -3,7 +3,7 @@ from fastapi import Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from app.schemas.profile import (ProfileUpdate, PasswordChange)
+from app.schemas.profile import (ProfileUpdate,PasswordChange)
 from app.database.connection import engine
 from app.database.base import Base
 from app.models.audit_log import AuditLog
@@ -16,7 +16,7 @@ from datetime import timedelta
 from app.dependencies.database import get_db
 from app.dependencies.auth import get_current_user
 
-from app.core.security import (hash_password, verify_password, create_access_token)
+from app.core.security import (hash_password,verify_password,create_access_token)
 
 from app.models.user import User
 from app.models.coupon import Coupon
@@ -45,12 +45,17 @@ def create_audit_log(
 ):
 
     log = AuditLog(
+
         user_id=user_id,
+
         action=action,
+
         details=details
+
     )
 
     db.add(log)
+
     db.commit()
 
 
@@ -62,65 +67,23 @@ def create_notification(
 ):
 
     notification = Notification(
+
         user_id=user_id,
+
         title=title,
+
         message=message
+
     )
 
     db.add(notification)
+
     db.commit()
-
-
-# ✅ Central action-to-display mapping
-ACTION_META = {
-
-    # Auth
-    "LOGIN":             ("USER",    "User Login"),
-    "REGISTER":          ("USER",    "User Registered"),
-    "PASSWORD_CHANGE":   ("USER",    "Password Changed"),
-
-    # Coupon
-    "CREATE_COUPON":     ("COUPON",  "Coupon Created"),
-    "UPDATE_COUPON":     ("COUPON",  "Coupon Updated"),
-    "DELETE_COUPON":     ("COUPON",  "Coupon Deleted"),
-    "EXPIRE_COUPON":     ("COUPON",  "Coupon Expired"),
-    "REDEEM_COUPON":     ("COUPON",  "Coupon Redeemed"),
-    "REQUEST_COUPON":    ("COUPON",  "Coupon Requested"),
-    "APPROVE_COUPON":    ("COUPON",  "Coupon Approved"),
-    "REJECT_COUPON":     ("COUPON",  "Coupon Rejected"),
-
-    # Sharing
-    "SHARE_COUPON":      ("SHARING", "Coupon Shared"),
-    "ACCEPT_SHARE":      ("SHARING", "Share Accepted"),
-    "REJECT_SHARE":      ("SHARING", "Share Rejected"),
-    "CANCEL_SHARE":      ("SHARING", "Share Cancelled"),
-
-    # Profile
-    "PROFILE_UPDATED":   ("USER",    "Profile Updated"),
-    "PASSWORD_CHANGED":  ("USER",    "Password Changed"),
-    "UPDATE_PROFILE":    ("USER",    "Profile Updated"),
-
-    # Notifications
-    "NOTIFICATION_SENT": ("NOTIFICATION", "Notification Sent"),
-    "NOTIFICATION_READ": ("NOTIFICATION", "Notification Read"),
-    "EXPIRY_REMINDER":   ("NOTIFICATION", "Expiry Reminder Sent"),
-
-    # Admin
-    "DELETE_USER":       ("ADMIN",   "User Deleted"),
-    "DISABLE_USER":      ("ADMIN",   "User Disabled"),
-    "ENABLE_USER":       ("ADMIN",   "User Enabled"),
-    "MAKE_ADMIN":        ("ADMIN",   "User Promoted To Admin"),
-    "REMOVE_ADMIN":      ("ADMIN",   "Admin Role Removed"),
-    "USER_DISABLED":     ("ADMIN",   "User Disabled"),
-    "USER_ENABLED":      ("ADMIN",   "User Enabled"),
-    "USER_PROMOTED":     ("ADMIN",   "User Promoted To Admin"),
-}
 
 
 app = FastAPI(
     title="RewardsHub API"
 )
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -267,7 +230,7 @@ def create_coupon(
         status="AVAILABLE",
         expiry_date=coupon.expiry_date,
         owner_id=current_user.id
-    )
+)
 
     db.add(new_coupon)
     db.commit()
@@ -433,14 +396,6 @@ def accept_share(
 
     db.commit()
 
-    # ✅ Added audit log for accept share
-    create_audit_log(
-        db,
-        current_user.id,
-        "ACCEPT_SHARE",
-        f"Coupon {share.coupon_id}"
-    )
-
     create_notification(
         db,
         share.sender_id,
@@ -487,14 +442,6 @@ def reject_share(
         coupon.is_shared = False
 
     db.commit()
-
-    # ✅ Added audit log for reject share
-    create_audit_log(
-        db,
-        current_user.id,
-        "REJECT_SHARE",
-        f"Coupon {share.coupon_id}"
-    )
 
     create_notification(
         db,
@@ -579,7 +526,9 @@ def get_stats(
 ):
 
     total_users = db.query(User).count()
+
     total_coupons = db.query(Coupon).count()
+
     total_shares = db.query(CouponShare).count()
 
     accepted_shares = (
@@ -598,84 +547,6 @@ def get_stats(
     }
 
 
-@app.get("/stats/users")
-def stats_users(
-    db: Session = Depends(get_db)
-):
-    users = db.query(User).all()
-
-    return [
-        {
-            "ID": user.id,
-            "Name": user.name,
-            "Email": user.email,
-            "Role": user.role,
-            "Active": user.is_active
-        }
-        for user in users
-    ]
-
-
-@app.get("/stats/coupons")
-def stats_coupons(
-    db: Session = Depends(get_db)
-):
-    coupons = db.query(Coupon).all()
-
-    return [
-        {
-            "ID": coupon.id,
-            "Title": coupon.title,
-            "Source": coupon.source_app,
-            "Status": coupon.status,
-            "Value": coupon.coupon_value,
-            "Expiry": coupon.expiry_date
-        }
-        for coupon in coupons
-    ]
-
-
-@app.get("/stats/shares")
-def stats_shares(
-    db: Session = Depends(get_db)
-):
-    shares = db.query(CouponShare).all()
-
-    return [
-        {
-            "ID": share.id,
-            "Coupon ID": share.coupon_id,
-            "Receiver ID": share.receiver_id,
-            "Status": share.status,
-            "Created": share.created_at
-        }
-        for share in shares
-    ]
-
-
-@app.get("/stats/accepted")
-def stats_accepted(
-    db: Session = Depends(get_db)
-):
-    shares = (
-        db.query(CouponShare)
-        .filter(
-            CouponShare.status == "ACCEPTED"
-        )
-        .all()
-    )
-
-    return [
-        {
-            "ID": share.id,
-            "Coupon ID": share.coupon_id,
-            "Receiver ID": share.receiver_id,
-            "Accepted": share.updated_at
-        }
-        for share in shares
-    ]
-
-
 @app.get("/expiry-dashboard")
 def expiry_dashboard(
     current_user: User = Depends(get_current_user),
@@ -683,7 +554,11 @@ def expiry_dashboard(
 ):
 
     today = date.today()
-    next_7_days = today + timedelta(days=7)
+
+    next_7_days = (
+        today +
+        timedelta(days=7)
+    )
 
     coupons = (
         db.query(Coupon)
@@ -733,43 +608,31 @@ def expiry_dashboard(
     }
 
 
-# ✅ Replaced /activity — now reads from AuditLog
 @app.get("/activity")
 def get_activity(
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
 
-    logs = (
-        db.query(AuditLog)
-        .filter(
-            AuditLog.user_id == current_user.id
+    coupons = db.query(Coupon).all()
+
+    activities = []
+
+    for coupon in coupons:
+
+        activities.append(
+            {
+                "type": "Coupon Created",
+                "title": coupon.title,
+                "created_at": coupon.created_at
+            }
         )
-        .order_by(
-            AuditLog.created_at.desc()
-        )
-        .limit(100)
-        .all()
+
+    activities.sort(
+        key=lambda x: x["created_at"],
+        reverse=True
     )
 
-    result = []
-
-    for log in logs:
-
-        meta = ACTION_META.get(
-            log.action,
-            ("OTHER", log.action)
-        )
-
-        result.append({
-            "category": meta[0],
-            "action": log.action,
-            "type": meta[1],
-            "title": log.details,
-            "created_at": log.created_at
-        })
-
-    return result
+    return activities[:10]
 
 
 # -------------------------
@@ -810,6 +673,7 @@ def update_profile(
     )
 
     if existing_email:
+
         return {
             "message": "Email already exists"
         }
@@ -819,11 +683,10 @@ def update_profile(
 
     db.commit()
 
-    # ✅ Updated audit action to PROFILE_UPDATED
     create_audit_log(
         db,
         current_user.id,
-        "PROFILE_UPDATED",
+        "UPDATE_PROFILE",
         current_user.email
     )
 
@@ -849,6 +712,7 @@ def change_password(
     )
 
     if not valid:
+
         return {
             "message": "Current password incorrect"
         }
@@ -859,35 +723,33 @@ def change_password(
 
     db.commit()
 
-    # ✅ Updated audit action to PASSWORD_CHANGED
     create_audit_log(
         db,
         current_user.id,
-        "PASSWORD_CHANGED",
-        current_user.email
+        "CHANGE_PASSWORD",
+        "Password Updated"
     )
 
     return {
         "message": "Password changed successfully"
     }
 
-
-# -------------------------
-# ADMIN
-# -------------------------
+#--------------------------
+#	Admin
+#--------------------------
 
 def verify_admin(
     current_user: User
 ):
 
     if current_user.role != "ADMIN":
+
         raise HTTPException(
             status_code=403,
             detail="Admin access required"
         )
 
     return True
-
 
 @app.get("/admin/stats")
 def admin_stats(
@@ -917,8 +779,15 @@ def admin_stats(
         .count()
     )
 
-    total_coupons = db.query(Coupon).count()
-    total_shares = db.query(CouponShare).count()
+    total_coupons = (
+        db.query(Coupon)
+        .count()
+    )
+
+    total_shares = (
+        db.query(CouponShare)
+        .count()
+    )
 
     accepted_shares = (
         db.query(CouponShare)
@@ -937,7 +806,6 @@ def admin_stats(
         "total_shares": total_shares,
         "accepted_shares": accepted_shares
     }
-
 
 @app.get("/admin/users")
 def admin_users(
@@ -992,23 +860,28 @@ def delete_user(
 
     user = (
         db.query(User)
-        .filter(User.id == user_id)
+        .filter(
+            User.id == user_id
+        )
         .first()
     )
 
     if not user:
+
         raise HTTPException(
             status_code=404,
             detail="User not found"
         )
 
     if user.id == current_user.id:
+
         raise HTTPException(
             status_code=400,
             detail="Cannot delete yourself"
         )
 
     if user.role == "ADMIN":
+
         raise HTTPException(
             status_code=400,
             detail="Cannot delete admin user"
@@ -1026,10 +899,13 @@ def delete_user(
             "DELETE FROM audit_logs "
             "WHERE user_id = :user_id"
         ),
-        {"user_id": user_id}
+        {
+            "user_id": user_id
+        }
     )
 
     db.delete(user)
+
     db.commit()
 
     return {
@@ -1038,7 +914,6 @@ def delete_user(
 
 
 def get_activity_category(action):
-
     auth_actions = [
         "LOGIN",
         "REGISTER",
@@ -1057,3 +932,324 @@ def get_activity_category(action):
         "DISABLE_USER",
         "ENABLE_USER",
         "MAKE_ADMIN",
+        "REMOVE_ADMIN"
+    ]
+
+    if action in auth_actions:
+        return "AUTH"
+
+    if action in coupon_actions:
+        return "COUPON"
+
+    if action in admin_actions:
+        return "ADMIN"
+
+    return "OTHER"
+
+
+@app.get("/admin/audit-logs")
+def get_audit_logs(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail="Admin only"
+        )
+    logs = (
+        db.query(AuditLog)
+        .order_by(
+            AuditLog.created_at.desc()
+        )
+        .limit(100)
+        .all()
+    )
+    return [
+        {
+            "id": log.id,
+            "user_id": log.user_id,
+            "action": log.action,
+            "details": log.details,
+            "created_at": log.created_at,
+            "category": get_activity_category(
+                log.action
+            )
+        }
+        for log in logs
+    ]
+
+
+# -------------------------
+# NOTIFICATIONS
+# -------------------------
+
+@app.get("/notifications")
+def get_notifications(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    notifications = (
+        db.query(Notification)
+        .filter(
+            Notification.user_id == current_user.id
+        )
+        .order_by(
+            Notification.created_at.desc()
+        )
+        .all()
+    )
+
+    return notifications
+
+
+@app.get("/notifications/unread-count")
+def unread_count(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    count = (
+        db.query(Notification)
+        .filter(
+            Notification.user_id == current_user.id,
+            Notification.is_read == False
+        )
+        .count()
+    )
+
+    return {
+        "count": count
+    }
+
+
+@app.put(
+    "/notifications/read/{notification_id}"
+)
+def mark_notification_read(
+    notification_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    notification = (
+        db.query(Notification)
+        .filter(
+            Notification.id == notification_id,
+            Notification.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not notification:
+
+        return {
+            "message": "Notification not found"
+        }
+
+    notification.is_read = True
+
+    db.commit()
+
+    return {
+        "message": "Notification marked as read"
+    }
+
+
+# -------------------------
+# DISABLE USER
+# -------------------------
+
+@app.put("/admin/user/{user_id}/disable")
+def disable_user(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    verify_admin(current_user)
+
+    user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .first()
+    )
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    if user.id == current_user.id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot disable yourself"
+        )
+
+    user.is_active = False
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "DISABLE_USER",
+        user.email
+    )
+
+    db.commit()
+
+    return {
+        "message": "User disabled successfully"
+    }
+
+
+# -------------------------
+# ENABLE USER
+# -------------------------
+
+@app.put("/admin/user/{user_id}/enable")
+def enable_user(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    verify_admin(current_user)
+
+    user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .first()
+    )
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    user.is_active = True
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "ENABLE_USER",
+        user.email
+    )
+
+    db.commit()
+
+    return {
+        "message": "User enabled successfully"
+    }
+
+@app.get("/marketplace")
+def marketplace(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    coupons = (
+        db.query(Coupon)
+        .filter(
+            Coupon.status == "AVAILABLE",
+            Coupon.owner_id != current_user.id
+        )
+        .all()
+    )
+
+    return [
+        {
+            "id": coupon.id,
+            "title": coupon.title,
+            "description": coupon.description,
+            "source_app": coupon.source_app,
+            "coupon_value": coupon.coupon_value,
+            "reward_amount": (
+                coupon.coupon_value * 25
+            ) // 100,
+            "owner_id": coupon.owner_id,
+            "status": coupon.status
+        }
+        for coupon in coupons
+    ]
+
+@app.post("/request-coupon/{coupon_id}")
+def request_coupon(
+    coupon_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    coupon = (
+        db.query(Coupon)
+        .filter(
+            Coupon.id == coupon_id
+        )
+        .first()
+    )
+
+    if not coupon:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Coupon not found"
+        )
+
+    if coupon.owner_id == current_user.id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot request your own coupon"
+        )
+
+    if coupon.status != "AVAILABLE":
+
+        raise HTTPException(
+            status_code=400,
+            detail="Coupon not available"
+        )
+
+    existing_request = (
+        db.query(CouponRequest)
+        .filter(
+            CouponRequest.coupon_id == coupon.id,
+            CouponRequest.buyer_id == current_user.id,
+            CouponRequest.status == "PENDING"
+        )
+        .first()
+    )
+
+    if existing_request:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Request already exists"
+        )
+
+    request = CouponRequest(
+        coupon_id=coupon.id,
+        buyer_id=current_user.id,
+        owner_id=coupon.owner_id,
+        status="PENDING"
+    )
+
+    db.add(request)
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "REQUEST_COUPON",
+        coupon.title
+    )
+
+    db.commit()
+
+    return {
+        "message": "Coupon request submitted"
+    }
+    
