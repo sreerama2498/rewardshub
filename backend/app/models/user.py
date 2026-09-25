@@ -3,7 +3,7 @@ from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import DateTime
 from sqlalchemy import Boolean
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database.base import Base
 
 class User(Base):
@@ -44,5 +44,5 @@ class User(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc)
     )

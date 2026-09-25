@@ -5,7 +5,7 @@ from sqlalchemy import Boolean
 from sqlalchemy import Date
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database.base import Base
 
 class Coupon(Base):
@@ -42,7 +42,7 @@ class Coupon(Base):
     )
     owner_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id", ondelete="CASCADE")
     )
     coupon_value = Column(
         Integer,
@@ -54,10 +54,10 @@ class Coupon(Base):
     )
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc)
     )
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
     )

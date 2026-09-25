@@ -25,8 +25,8 @@ const [couponValue,
 
 const [expiryDate, setExpiryDate] = useState("");
 
-  const [receiverEmail, setReceiverEmail] =
-    useState("");
+  const [receiverEmails, setReceiverEmails] =
+    useState({});
 
   const loadCoupons = async () => {
 
@@ -84,7 +84,7 @@ const [expiryDate, setExpiryDate] = useState("");
           source_app: sourceApp,
           coupon_code: couponCode,
           coupon_value:
-          parseInt(couponValue),
+          parseInt(couponValue, 10) || 0,
           expiry_date: expiryDate
         },
         {
@@ -98,6 +98,13 @@ const [expiryDate, setExpiryDate] = useState("");
       toast.success(
         "Coupon Created"
       );
+
+      setTitle("");
+      setDescription("");
+      setSourceApp("");
+      setCouponCode("");
+      setCouponValue("");
+      setExpiryDate("");
 
       loadCoupons();
 
@@ -128,7 +135,7 @@ const [expiryDate, setExpiryDate] = useState("");
           {
             coupon_id: couponId,
             receiver_email:
-              receiverEmail
+              receiverEmails[couponId]
           },
           {
             headers: {
@@ -228,6 +235,7 @@ const [expiryDate, setExpiryDate] = useState("");
         <input
           className="form-control mb-2"
           placeholder="Title"
+          value={title}
           onChange={(e) =>
             setTitle(
               e.target.value
@@ -238,6 +246,7 @@ const [expiryDate, setExpiryDate] = useState("");
         <input
           className="form-control mb-2"
           placeholder="Description"
+          value={description}
           onChange={(e) =>
             setDescription(
               e.target.value
@@ -248,6 +257,7 @@ const [expiryDate, setExpiryDate] = useState("");
         <input
           className="form-control mb-2"
           placeholder="Source App"
+          value={sourceApp}
           onChange={(e) =>
             setSourceApp(
               e.target.value
@@ -258,6 +268,7 @@ const [expiryDate, setExpiryDate] = useState("");
         <input
           className="form-control mb-2"
           placeholder="Coupon Code"
+          value={couponCode}
           onChange={(e) =>
             setCouponCode(
               e.target.value
@@ -268,6 +279,7 @@ const [expiryDate, setExpiryDate] = useState("");
   type="number"
   className="form-control mb-2"
   placeholder="Coupon Value (₹)"
+  value={couponValue}
   onChange={(e) =>
     setCouponValue(
       e.target.value
@@ -277,6 +289,7 @@ const [expiryDate, setExpiryDate] = useState("");
         <input
           type="date"
           className="form-control mb-3"
+          value={expiryDate}
           onChange={(e) =>
             setExpiryDate(
               e.target.value
@@ -487,10 +500,9 @@ const [expiryDate, setExpiryDate] = useState("");
                       placeholder="
                         Receiver Email
                       "
+                      value={receiverEmails[coupon.id] || ""}
                       onChange={(e) =>
-                        setReceiverEmail(
-                          e.target.value
-                        )
+                        setReceiverEmails(prev => ({...prev, [coupon.id]: e.target.value}))
                       }
                     />
 

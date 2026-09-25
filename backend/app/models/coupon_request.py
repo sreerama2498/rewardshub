@@ -4,7 +4,7 @@ from sqlalchemy import String
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database.base import Base
 
@@ -21,17 +21,17 @@ class CouponRequest(Base):
 
     coupon_id = Column(
         Integer,
-        ForeignKey("coupons.id")
+        ForeignKey("coupons.id", ondelete="CASCADE")
     )
 
     buyer_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id", ondelete="CASCADE")
     )
 
     owner_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id", ondelete="CASCADE")
     )
 
     status = Column(
@@ -41,5 +41,5 @@ class CouponRequest(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc)
     )

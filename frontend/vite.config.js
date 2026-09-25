@@ -6,15 +6,18 @@ export default defineConfig({
   plugins: [react()],
 
   server: {
-
     host: "0.0.0.0",
-
     allowedHosts: [
-
-      "rewardshub.sreeram.site"
-
-    ]
-
+      "rewardshub.sreeram.site",
+      "localhost",
+      "127.0.0.1"
+    ],
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true
+      }
+    }
   }
 
 });

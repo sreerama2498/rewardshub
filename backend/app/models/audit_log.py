@@ -5,7 +5,7 @@ from sqlalchemy import Text
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database.base import Base
 
@@ -22,7 +22,7 @@ class AuditLog(Base):
 
     user_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id", ondelete="CASCADE")
     )
 
     action = Column(
@@ -35,5 +35,5 @@ class AuditLog(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc)
     )

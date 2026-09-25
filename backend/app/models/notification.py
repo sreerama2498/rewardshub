@@ -6,7 +6,7 @@ from sqlalchemy import Boolean
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database.base import Base
 
@@ -23,7 +23,7 @@ class Notification(Base):
 
     user_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id", ondelete="CASCADE")
     )
 
     title = Column(String)
@@ -37,5 +37,5 @@ class Notification(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc)
     )

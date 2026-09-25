@@ -23,17 +23,9 @@ export default function Login() {
         }
       );
 
-      console.log("LOGIN RESPONSE:");
-      console.log(response.data);
-
       localStorage.setItem(
         "token",
         response.data.access_token
-      );
-
-      console.log(
-        "TOKEN STORED:",
-        localStorage.getItem("token")
       );
 
       toast.success(
@@ -43,9 +35,6 @@ export default function Login() {
       navigate("/dashboard");
 
     } catch (error) {
-
-      console.log("LOGIN ERROR:");
-      console.log(error);
 
       toast.error(
         "Invalid Email or Password"

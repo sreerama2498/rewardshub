@@ -84,12 +84,14 @@ def create_notification(
 app = FastAPI(
     title="RewardsHub API"
 )
+import os as _os
+_cors_origins = _os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://localhost:5174"
+).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174"
-    ],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -118,9 +120,10 @@ def register_user(
     )
 
     if existing_user:
-        return {
-            "message": "Email already exists"
-        }
+        raise HTTPException(
+            status_code=409,
+            detail="Email already exists"
+        )
 
     new_user = User(
         name=user.name,
@@ -156,9 +159,10 @@ def login(
     )
 
     if not existing_user:
-        return {
-            "message": "Invalid credentials"
-        }
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
 
     if not existing_user.is_active:
         raise HTTPException(
@@ -172,9 +176,10 @@ def login(
     )
 
     if not valid:
-        return {
-            "message": "Invalid credentials"
-        }
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
 
     token = create_access_token(
         {
@@ -457,6 +462,7 @@ def reject_share(
 
 @app.get("/users")
 def get_users(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     users = db.query(User).all()
@@ -522,6 +528,7 @@ def get_sent_shares(
 
 @app.get("/stats")
 def get_stats(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
 

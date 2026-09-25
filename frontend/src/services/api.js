@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toast } from "react-toastify";
 
 const api = axios.create({
 
@@ -35,7 +36,7 @@ api.interceptors.response.use(
 
       localStorage.removeItem("token");
 
-      alert(
+      toast.error(
         "Session expired. Please login again."
       );
 

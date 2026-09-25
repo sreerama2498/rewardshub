@@ -5,8 +5,6 @@ services:
     restart: unless-stopped
     environment:
       TZ: Asia/Kolkata
-    ports:
-      - "3001:3001"
     volumes:
       - uptime-kuma:/app/data
 
@@ -16,8 +14,6 @@ services:
     restart: unless-stopped
     environment:
       TZ: Asia/Kolkata
-    ports:
-      - "9100:9100"
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -25,8 +21,6 @@ services:
     restart: unless-stopped
     environment:
       TZ: Asia/Kolkata
-    ports:
-      - "8080:8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -39,10 +33,9 @@ services:
     restart: unless-stopped
     environment:
       TZ: Asia/Kolkata
-    ports:
-      - "9090:9090"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     depends_on:
       - node-exporter
       - cadvisor
@@ -53,8 +46,6 @@ services:
     restart: unless-stopped
     environment:
       TZ: Asia/Kolkata
-    ports:
-      - "3002:3000"
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
@@ -66,15 +57,14 @@ services:
     restart: unless-stopped
     environment:
       TZ: Asia/Kolkata
-      DATA_SOURCE_NAME: "postgresql://rewarduser:rewardpass@rewardshub-postgres:5432/rewardshub?sslmode=disable"
-    depends_on:
-      - prometheus
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@rewardshub-postgres:5432/${POSTGRES_DB:-rewardshub}?sslmode=disable"
 
 volumes:
   uptime-kuma:
   grafana_data:
+  prometheus_data:
 
-# ✅ Added shared network
+# Shared network with main app
 networks:
   default:
     external: true

@@ -4,7 +4,7 @@ from sqlalchemy import String
 from sqlalchemy import ForeignKey
 from sqlalchemy import DateTime
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database.base import Base
 
@@ -20,17 +20,17 @@ class CouponShare(Base):
 
     coupon_id = Column(
         Integer,
-        ForeignKey("coupons.id")
+        ForeignKey("coupons.id", ondelete="CASCADE")
     )
 
     sender_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id", ondelete="CASCADE")
     )
 
     receiver_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id", ondelete="CASCADE")
     )
 
     status = Column(
@@ -40,11 +40,11 @@ class CouponShare(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc)
     )
 
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
     )

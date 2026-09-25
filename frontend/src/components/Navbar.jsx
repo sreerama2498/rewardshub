@@ -1,9 +1,23 @@
 import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import NotificationBadge from "./NotificationBadge";
 
 export default function Navbar() {
 
   const navigate = useNavigate();
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem("token");
+      if (token) {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        setUserRole(payload.role || null);
+      }
+    } catch {
+      setUserRole(null);
+    }
+  }, []);
 
   return (
 
@@ -48,14 +62,16 @@ export default function Navbar() {
         >
           Coupons
         </button>
-<button
-  className="btn btn-outline-light me-2"
-  onClick={() =>
-    navigate("/marketplace")
-  }
->
-  Marketplace
-</button>
+
+        <button
+          className="btn btn-outline-light me-2"
+          onClick={() =>
+            navigate("/marketplace")
+          }
+        >
+          Marketplace
+        </button>
+
         <button
           className="btn btn-outline-light me-2"
           onClick={() =>
@@ -92,14 +108,16 @@ export default function Navbar() {
           Profile
         </button>
 
-        <button
-          className="btn btn-warning me-2"
-          onClick={() =>
-            navigate("/admin")
-          }
-        >
-          Admin
-        </button>
+        {userRole === "ADMIN" && (
+          <button
+            className="btn btn-warning me-2"
+            onClick={() =>
+              navigate("/admin")
+            }
+          >
+            Admin
+          </button>
+        )}
 
         <NotificationBadge />
 

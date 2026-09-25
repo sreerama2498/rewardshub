@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import api from "../services/api";
 
 export default function Register() {
@@ -23,7 +24,7 @@ export default function Register() {
         }
       );
 
-      alert("Registration Successful");
+      toast.success("Registration Successful");
 
       navigate("/");
 
@@ -31,7 +32,7 @@ export default function Register() {
 
       console.log(error);
 
-      alert("Registration Failed");
+      toast.error("Registration Failed");
 
     }
 
