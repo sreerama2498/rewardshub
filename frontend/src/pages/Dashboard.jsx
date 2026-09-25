@@ -248,112 +248,110 @@ export default function Dashboard() {
 
       <Navbar />
 
-      <h1 className="mb-4">
-        RewardsHub Dashboard
-      </h1>
+      {/* Welcome Banner */}
+      <div
+        className="card mb-4 border-0 text-white overflow-hidden position-relative shadow-md"
+        style={{
+          background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%)",
+          borderRadius: "18px"
+        }}
+      >
+        <div className="card-body p-4 position-relative" style={{ zIndex: 1 }}>
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <span className="badge bg-white text-dark fw-bold px-2 py-1 rounded-pill">
+                  {user.role === "ADMIN" ? "👑 Admin Account" : "✨ Member"}
+                </span>
+                <span className="text-white-50 small">ID: #{user.id}</span>
+              </div>
+              <h2 className="text-white fw-bold mb-1" style={{ fontSize: "28px" }}>
+                Welcome back, {user.name}! 👋
+              </h2>
+              <p className="text-white-50 mb-0">
+                {user.email} • Track, share, and redeem your rewards effortlessly
+              </p>
+            </div>
 
-      <div className="card mb-4">
-        <div className="card-body">
-
-          <h3>
-            Welcome {user.name}
-          </h3>
-
-          <p>
-            <strong>Email:</strong>{" "}
-            {user.email}
-          </p>
-
-          <p>
-            <strong>User ID:</strong>{" "}
-            {user.id}
-          </p>
-
-          <p>
-            <strong>Role:</strong>{" "}
-            <span className={`badge ${user.role === "ADMIN" ? "bg-warning text-dark" : "bg-secondary"}`}>
-              {user.role || "USER"}
-            </span>
-          </p>
-
-          {user.role === "ADMIN" && (
-            <button
-              className="btn btn-warning mt-2"
-              onClick={() => navigate("/admin")}
-            >
-              Open Admin Panel
-            </button>
-          )}
-
+            <div className="d-flex align-items-center gap-2">
+              <button
+                className="btn btn-light fw-bold"
+                onClick={() => navigate("/my-coupons")}
+              >
+                + Add Coupon
+              </button>
+              {user.role === "ADMIN" && (
+                <button
+                  className="btn btn-warning fw-bold"
+                  onClick={() => navigate("/admin")}
+                >
+                  👑 Admin Panel
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <h2 className="mb-3">
-        Statistics
-      </h2>
+      <div className="d-flex align-items-center justify-content-between mb-3">
+        <h3 className="fw-bold mb-0 text-dark" style={{ fontSize: "20px" }}>
+          Platform Overview
+        </h3>
+        <span className="text-muted small">Click any metric for details</span>
+      </div>
 
-      <div className="row mb-4">
-
-        <div className="col-md-3 mb-3">
+      <div className="row mb-4 g-3">
+        <div className="col-6 col-md-3">
           <div
-            className="card text-center shadow-sm"
-            style={{ cursor: "pointer" }}
-            onClick={() =>
-              openStatsModal("users", "Total Users")
-            }
+            className="stat-widget"
+            onClick={() => openStatsModal("users", "Total Registered Users")}
           >
-            <div className="card-body">
-              <h5>Total Users</h5>
-              <h2>{stats?.total_users || 0}</h2>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span className="text-muted small fw-semibold">Total Users</span>
+              <span className="p-2 rounded-3" style={{ background: "#eef2ff", fontSize: "16px" }}>👥</span>
             </div>
+            <div className="stat-number">{stats?.total_users || 0}</div>
           </div>
         </div>
 
-        <div className="col-md-3 mb-3">
+        <div className="col-6 col-md-3">
           <div
-            className="card text-center shadow-sm"
-            style={{ cursor: "pointer" }}
-            onClick={() =>
-              openStatsModal("coupons", "Coupons")
-            }
+            className="stat-widget"
+            onClick={() => openStatsModal("coupons", "Total Available Coupons")}
           >
-            <div className="card-body">
-              <h5>Coupons</h5>
-              <h2>{stats?.total_coupons || 0}</h2>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span className="text-muted small fw-semibold">Coupons</span>
+              <span className="p-2 rounded-3" style={{ background: "#fdf4ff", fontSize: "16px" }}>🎟️</span>
             </div>
+            <div className="stat-number">{stats?.total_coupons || 0}</div>
           </div>
         </div>
 
-        <div className="col-md-3 mb-3">
+        <div className="col-6 col-md-3">
           <div
-            className="card text-center shadow-sm"
-            style={{ cursor: "pointer" }}
-            onClick={() =>
-              openStatsModal("shares", "Shares")
-            }
+            className="stat-widget"
+            onClick={() => openStatsModal("shares", "Total Shared Coupons")}
           >
-            <div className="card-body">
-              <h5>Shares</h5>
-              <h2>{stats?.total_shares || 0}</h2>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span className="text-muted small fw-semibold">Shares</span>
+              <span className="p-2 rounded-3" style={{ background: "#ecfeff", fontSize: "16px" }}>🤝</span>
             </div>
+            <div className="stat-number">{stats?.total_shares || 0}</div>
           </div>
         </div>
 
-        <div className="col-md-3 mb-3">
+        <div className="col-6 col-md-3">
           <div
-            className="card text-center shadow-sm"
-            style={{ cursor: "pointer" }}
-            onClick={() =>
-              openStatsModal("accepted", "Accepted Shares")
-            }
+            className="stat-widget"
+            onClick={() => openStatsModal("accepted", "Accepted Coupon Shares")}
           >
-            <div className="card-body">
-              <h5>Accepted</h5>
-              <h2>{stats?.accepted_shares || 0}</h2>
+            <div className="d-flex align-items-center justify-content-between mb-2">
+              <span className="text-muted small fw-semibold">Accepted</span>
+              <span className="p-2 rounded-3" style={{ background: "#ecfdf5", fontSize: "16px" }}>✅</span>
             </div>
+            <div className="stat-number">{stats?.accepted_shares || 0}</div>
           </div>
         </div>
-
       </div>
 
       <ExpiryDashboard />

@@ -1,30 +1,26 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import NotificationBadge from "./NotificationBadge";
-
 import api from "../services/api";
 
 export default function Navbar() {
-
   const navigate = useNavigate();
+  const location = useLocation();
   const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
-    let roleFound = false;
     try {
       const token = localStorage.getItem("token");
       if (token) {
         const payload = JSON.parse(atob(token.split(".")[1]));
         if (payload.role) {
           setUserRole(payload.role);
-          roleFound = true;
         }
       }
     } catch (e) {
       console.error("Token decode error:", e);
     }
 
-    // Also fetch /me to always sync the latest role from DB
     api.get("/me")
       .then((res) => {
         if (res.data?.role) {
@@ -34,127 +30,87 @@ export default function Navbar() {
       .catch(() => {});
   }, []);
 
+  const isActive = (path) => location.pathname === path;
+
+  const navItems = [
+    { label: "Dashboard", path: "/dashboard", icon: "📊" },
+    { label: "My Coupons", path: "/my-coupons", icon: "🎟️" },
+    { label: "Marketplace", path: "/marketplace", icon: "🛒" },
+    { label: "Received", path: "/shared-with-me", icon: "📥" },
+    { label: "Sent", path: "/sent-shares", icon: "📤" },
+    { label: "Community", path: "/users", icon: "👥" },
+    { label: "Profile", path: "/profile", icon: "👤" },
+  ];
+
   return (
-
-    <nav
-      className="
-        navbar
-        navbar-expand-lg
-        navbar-dark
-        bg-dark
-        mb-4
-        px-3
-      "
-    >
-
-      <span className="navbar-brand">
-        RewardsHub
-      </span>
-
-      <div>
-
-        <button
-          className="btn btn-outline-light me-2"
-          onClick={() => navigate(-1)}
+    <nav className="navbar navbar-expand-lg bg-white border-bottom shadow-sm mb-4 px-4 py-2 sticky-top" style={{ borderColor: "#e2e8f0" }}>
+      <div className="container-fluid px-0">
+        {/* Brand */}
+        <span
+          className="navbar-brand d-flex align-items-center gap-2 fw-bold fs-4 mb-0"
+          style={{ cursor: "pointer", background: "linear-gradient(135deg, #6366f1, #a855f7)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+          onClick={() => navigate("/dashboard")}
         >
-          Back
-        </button>
+          <span>🎁</span>
+          <span>RewardsHub</span>
+        </span>
 
-        <button
-          className="btn btn-outline-light me-2"
-          onClick={() =>
-            navigate("/dashboard")
-          }
-        >
-          Home
-        </button>
+        {/* Navigation links */}
+        <div className="d-flex align-items-center flex-wrap gap-2">
+          {navItems.map((item) => (
+            <button
+              key={item.path}
+              className={`btn btn-sm ${
+                isActive(item.path)
+                  ? "btn-primary text-white"
+                  : "btn-light text-secondary border-0"
+              }`}
+              style={{
+                borderRadius: "10px",
+                padding: "7px 14px",
+                fontSize: "14px",
+                fontWeight: isActive(item.path) ? "600" : "500"
+              }}
+              onClick={() => navigate(item.path)}
+            >
+              <span className="me-1">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
 
-        <button
-          className="btn btn-outline-light me-2"
-          onClick={() =>
-            navigate("/my-coupons")
-          }
-        >
-          Coupons
-        </button>
+          {/* Admin Panel button */}
+          {userRole === "ADMIN" && (
+            <button
+              className={`btn btn-sm ${
+                isActive("/admin")
+                  ? "btn-warning text-dark fw-bold"
+                  : "btn-outline-warning text-dark fw-semibold"
+              }`}
+              style={{ borderRadius: "10px", padding: "7px 14px", fontSize: "14px" }}
+              onClick={() => navigate("/admin")}
+            >
+              👑 Admin Panel
+            </button>
+          )}
 
-        <button
-          className="btn btn-outline-light me-2"
-          onClick={() =>
-            navigate("/marketplace")
-          }
-        >
-          Marketplace
-        </button>
+          {/* Notification Badge */}
+          <div className="ms-1">
+            <NotificationBadge />
+          </div>
 
-        <button
-          className="btn btn-outline-light me-2"
-          onClick={() =>
-            navigate("/shared-with-me")
-          }
-        >
-          Shares
-        </button>
-
-        <button
-          className="btn btn-outline-light me-2"
-          onClick={() =>
-            navigate("/sent-shares")
-          }
-        >
-          Sent Shares
-        </button>
-
-        <button
-          className="btn btn-outline-light me-2"
-          onClick={() =>
-            navigate("/users")
-          }
-        >
-          Users
-        </button>
-
-        <button
-          className="btn btn-outline-light me-2"
-          onClick={() =>
-            navigate("/profile")
-          }
-        >
-          Profile
-        </button>
-
-        {userRole === "ADMIN" && (
+          {/* Logout */}
           <button
-            className="btn btn-warning me-2"
-            onClick={() =>
-              navigate("/admin")
-            }
+            className="btn btn-sm btn-outline-danger ms-2"
+            style={{ borderRadius: "10px", padding: "7px 14px", fontSize: "14px" }}
+            onClick={() => {
+              localStorage.removeItem("token");
+              navigate("/");
+            }}
           >
-            Admin
+            Logout
           </button>
-        )}
-
-        <NotificationBadge />
-
-        <button
-          className="btn btn-danger"
-          onClick={() => {
-
-            localStorage.removeItem(
-              "token"
-            );
-
-            navigate("/");
-
-          }}
-        >
-          Logout
-        </button>
-
+        </div>
       </div>
-
     </nav>
-
   );
-
 }

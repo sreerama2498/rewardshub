@@ -142,89 +142,61 @@ export default function SharedCoupons() {
 
       <hr />
 
-      {
-        shares.length === 0 ? (
+      {shares.length === 0 ? (
+        <div className="card text-center p-5 border-dashed">
+          <div style={{ fontSize: "40px" }} className="mb-2">📥</div>
+          <h5 className="fw-semibold text-dark">No shared coupons yet</h5>
+          <p className="text-muted small">Coupons shared by other users with your email will appear here.</p>
+        </div>
+      ) : (
+        <div className="row g-3">
+          {shares.map((share) => (
+            <div key={share.id} className="col-12 col-md-6 col-lg-4">
+              <div className="card h-100 shadow-sm border-0" style={{ borderRadius: "14px", border: "1px solid #e2e8f0" }}>
+                <div className="card-body p-4 d-flex flex-column justify-content-between">
+                  <div>
+                    <div className="d-flex align-items-center justify-content-between mb-3">
+                      <span className="badge-soft badge-soft-primary">
+                        Share #{share.id}
+                      </span>
+                      <span className={`badge-soft ${
+                        share.status === "ACCEPTED" ? "badge-soft-success" :
+                        share.status === "REJECTED" ? "badge-soft-danger" : "badge-soft-warning"
+                      }`}>
+                        {share.status || "PENDING"}
+                      </span>
+                    </div>
 
-          <div
-            className="
-              alert
-              alert-info
-            "
-          >
-            No shared coupons.
-          </div>
+                    <h5 className="fw-bold text-dark mb-1">
+                      Incoming Coupon Gift
+                    </h5>
+                    <p className="text-muted small mb-3">
+                      A coupon was shared with your account.
+                    </p>
+                  </div>
 
-        ) : (
-
-          shares.map((share) => (
-
-            <div
-              key={share.id}
-              className="
-                card
-                mb-3
-                shadow-sm
-              "
-            >
-
-              <div
-                className="card-body"
-              >
-
-                <h5>
-                  Share Request #
-                  {share.id}
-                </h5>
-
-                <p>
-
-                  <strong>
-                    Status:
-                  </strong>
-
-                  {" "}
-
-                  {share.status}
-
-                </p>
-
-                <button
-                  className="
-                    btn
-                    btn-success
-                    me-2
-                  "
-                  onClick={() =>
-                    acceptShare(
-                      share.id
-                    )
-                  }
-                >
-                  Accept
-                </button>
-
-                <button
-                  className="
-                    btn
-                    btn-danger
-                  "
-                  onClick={() =>
-                    rejectShare(
-                      share.id
-                    )
-                  }
-                >
-                  Reject
-                </button>
-
+                  {share.status === "PENDING" && (
+                    <div className="d-flex gap-2 pt-3 border-top" style={{ borderColor: "#f1f5f9" }}>
+                      <button
+                        className="btn btn-primary flex-grow-1 btn-sm py-2"
+                        onClick={() => acceptShare(share.id)}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        className="btn btn-outline-danger btn-sm px-3"
+                        onClick={() => rejectShare(share.id)}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-
             </div>
-
-          ))
-
-        )
-      }
+          ))}
+        </div>
+      )}
 
     </div>
 
