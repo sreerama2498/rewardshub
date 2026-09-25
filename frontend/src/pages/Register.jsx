@@ -32,7 +32,8 @@ export default function Register() {
 
       console.log(error);
 
-      toast.error("Registration Failed");
+      const msg = error.response?.data?.detail || "Registration Failed";
+      toast.error(typeof msg === "string" ? msg : JSON.stringify(msg));
 
     }
 
