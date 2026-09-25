@@ -269,6 +269,22 @@ export default function Dashboard() {
             {user.id}
           </p>
 
+          <p>
+            <strong>Role:</strong>{" "}
+            <span className={`badge ${user.role === "ADMIN" ? "bg-warning text-dark" : "bg-secondary"}`}>
+              {user.role || "USER"}
+            </span>
+          </p>
+
+          {user.role === "ADMIN" && (
+            <button
+              className="btn btn-warning mt-2"
+              onClick={() => navigate("/admin")}
+            >
+              Open Admin Panel
+            </button>
+          )}
+
         </div>
       </div>
 

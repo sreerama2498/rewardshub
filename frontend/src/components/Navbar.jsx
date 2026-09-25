@@ -2,21 +2,36 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import NotificationBadge from "./NotificationBadge";
 
+import api from "../services/api";
+
 export default function Navbar() {
 
   const navigate = useNavigate();
   const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
+    let roleFound = false;
     try {
       const token = localStorage.getItem("token");
       if (token) {
         const payload = JSON.parse(atob(token.split(".")[1]));
-        setUserRole(payload.role || null);
+        if (payload.role) {
+          setUserRole(payload.role);
+          roleFound = true;
+        }
       }
-    } catch {
-      setUserRole(null);
+    } catch (e) {
+      console.error("Token decode error:", e);
     }
+
+    // Also fetch /me to always sync the latest role from DB
+    api.get("/me")
+      .then((res) => {
+        if (res.data?.role) {
+          setUserRole(res.data.role);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   return (

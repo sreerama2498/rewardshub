@@ -184,7 +184,8 @@ def login(
     token = create_access_token(
         {
             "sub": str(existing_user.id),
-            "email": existing_user.email
+            "email": existing_user.email,
+            "role": existing_user.role
         }
     )
 
@@ -212,7 +213,8 @@ def get_me(
     return {
         "id": current_user.id,
         "name": current_user.name,
-        "email": current_user.email
+        "email": current_user.email,
+        "role": current_user.role
     }
 
 
