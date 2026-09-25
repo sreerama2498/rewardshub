@@ -39,6 +39,21 @@ class CouponRequest(Base):
         default="PENDING"
     )
 
+    total_price = Column(
+        Integer,
+        default=0
+    )
+
+    owner_payout = Column(
+        Integer,
+        default=0
+    )
+
+    platform_fee = Column(
+        Integer,
+        default=0
+    )
+
     created_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc)

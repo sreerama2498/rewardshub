@@ -1216,21 +1216,27 @@ def marketplace(
         .all()
     )
 
-    return [
-        {
+    marketplace_items = []
+    for coupon in coupons:
+        val = coupon.coupon_value or 0
+        total_price = round(val * 0.25, 2)
+        owner_payout = round(val * 0.20, 2)
+        platform_fee = round(val * 0.05, 2)
+
+        marketplace_items.append({
             "id": coupon.id,
             "title": coupon.title,
             "description": coupon.description,
             "source_app": coupon.source_app,
-            "coupon_value": coupon.coupon_value,
-            "reward_amount": (
-                coupon.coupon_value * 25
-            ) // 100,
+            "coupon_value": val,
+            "total_price": total_price,
+            "owner_payout": owner_payout,
+            "platform_fee": platform_fee,
             "owner_id": coupon.owner_id,
             "status": coupon.status
-        }
-        for coupon in coupons
-    ]
+        })
+
+    return marketplace_items
 
 @app.post("/request-coupon/{coupon_id}")
 def request_coupon(
@@ -1285,25 +1291,43 @@ def request_coupon(
             detail="Request already exists"
         )
 
+    val = coupon.coupon_value or 0
+    total_price = round(val * 0.25, 2)
+    owner_payout = round(val * 0.20, 2)
+    platform_fee = round(val * 0.05, 2)
+
     request = CouponRequest(
         coupon_id=coupon.id,
         buyer_id=current_user.id,
         owner_id=coupon.owner_id,
+        total_price=total_price,
+        owner_payout=owner_payout,
+        platform_fee=platform_fee,
         status="PENDING"
     )
 
     db.add(request)
 
+    create_notification(
+        db,
+        coupon.owner_id,
+        "New Coupon Request",
+        f"{current_user.name} requested '{coupon.title}'. Payout on settlement: ₹{owner_payout} (Platform fee: ₹{platform_fee})."
+    )
+
     create_audit_log(
         db,
         current_user.id,
         "REQUEST_COUPON",
-        coupon.title
+        f"{coupon.title} - Total: ₹{total_price} (Owner: ₹{owner_payout}, Fee: ₹{platform_fee})"
     )
 
     db.commit()
 
     return {
-        "message": "Coupon request submitted"
+        "message": f"Coupon request submitted. Total to pay: ₹{total_price} (Owner receives ₹{owner_payout}, Platform fee: ₹{platform_fee})",
+        "total_price": total_price,
+        "owner_payout": owner_payout,
+        "platform_fee": platform_fee
     }
     

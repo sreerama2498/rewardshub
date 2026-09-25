@@ -122,81 +122,136 @@ export default function Marketplace() {
 
   return (
 
-    <div className="container mt-4">
+    <div className="container mt-4 mb-5">
 
       <Navbar />
 
-      <h1>
-        Coupon Marketplace
-      </h1>
+      {/* Header Banner with Business Rules */}
+      <div
+        className="card mb-4 border-0 text-white overflow-hidden shadow-md"
+        style={{
+          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+          borderRadius: "18px"
+        }}
+      >
+        <div className="card-body p-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+          <div>
+            <div className="d-flex align-items-center gap-2 mb-2">
+              <span className="badge bg-primary px-3 py-1 rounded-pill">
+                Fair Trade Marketplace
+              </span>
+              <span className="text-white-50 small">Instant Claim & Settlement</span>
+            </div>
+            <h2 className="text-white fw-bold mb-1" style={{ fontSize: "26px" }}>
+              Coupon Marketplace 🛒
+            </h2>
+            <p className="text-white-50 mb-0 small">
+              Request high-value coupons at <strong>25% of face value</strong>. 
+              Owner receives <strong>20% payout</strong>, and <strong>5% platform fee</strong> covers secure transaction settlement.
+            </p>
+          </div>
 
-      <hr />
+          <div className="d-flex gap-2 bg-dark bg-opacity-50 p-2 rounded-3 border border-secondary border-opacity-25">
+            <div className="text-center px-3 py-1 border-end border-secondary border-opacity-25">
+              <span className="text-muted small d-block" style={{ fontSize: "11px" }}>YOU PAY</span>
+              <span className="fw-bold text-warning fs-6">25%</span>
+            </div>
+            <div className="text-center px-3 py-1 border-end border-secondary border-opacity-25">
+              <span className="text-muted small d-block" style={{ fontSize: "11px" }}>OWNER GETS</span>
+              <span className="fw-bold text-success fs-6">20%</span>
+            </div>
+            <div className="text-center px-3 py-1">
+              <span className="text-muted small d-block" style={{ fontSize: "11px" }}>FEE</span>
+              <span className="fw-bold text-info fs-6">5%</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <div className="row">
+      <div className="row g-3">
 
         {
           coupons.length === 0 && (
-
-            <div className="alert alert-info">
-
-              No coupons available.
-
+            <div className="col-12">
+              <div className="card text-center p-5 border-dashed">
+                <div style={{ fontSize: "40px" }} className="mb-2">🛒</div>
+                <h5 className="fw-semibold text-dark">No marketplace coupons available</h5>
+                <p className="text-muted small">Check back soon or share your own unused coupons to earn rewards.</p>
+              </div>
             </div>
-
           )
         }
 
         {
-          coupons.map((coupon) => (
-            <div className="col-12 col-md-6 col-lg-4" key={coupon.id}>
-              <div className="card h-100 card-coupon shadow-sm">
-                <div className="card-body p-4 d-flex flex-column justify-content-between">
-                  <div>
-                    {/* Header */}
-                    <div className="d-flex align-items-start justify-content-between gap-2 mb-3">
-                      <CouponLogo
-                        title={coupon.title}
-                        sourceApp={coupon.source_app}
-                        description={coupon.description}
-                        size={46}
-                      />
-                      <span className="badge-soft badge-soft-primary">
-                        {coupon.source_app}
-                      </span>
+          coupons.map((coupon) => {
+            const val = coupon.coupon_value || 0;
+            const totalPrice = coupon.total_price ?? Math.round(val * 0.25);
+            const ownerPayout = coupon.owner_payout ?? Math.round(val * 0.20);
+            const platformFee = coupon.platform_fee ?? Math.round(val * 0.05);
+
+            return (
+              <div className="col-12 col-md-6 col-lg-4" key={coupon.id}>
+                <div className="card h-100 card-coupon shadow-sm">
+                  <div className="card-body p-4 d-flex flex-column justify-content-between">
+                    <div>
+                      {/* Header */}
+                      <div className="d-flex align-items-start justify-content-between gap-2 mb-3">
+                        <CouponLogo
+                          title={coupon.title}
+                          sourceApp={coupon.source_app}
+                          description={coupon.description}
+                          size={46}
+                        />
+                        <span className="badge-soft badge-soft-primary">
+                          {coupon.source_app}
+                        </span>
+                      </div>
+
+                      <h5 className="fw-bold text-dark mb-1" style={{ fontSize: "17px", lineHeight: "1.3" }}>
+                        {coupon.title}
+                      </h5>
+                      {coupon.description && (
+                        <p className="text-muted small mb-3" style={{ fontSize: "13px" }}>
+                          {coupon.description}
+                        </p>
+                      )}
+
+                      {/* Face Value & Total to Pay */}
+                      <div className="coupon-ticket-notch mb-3 d-flex align-items-center justify-content-between">
+                        <div>
+                          <span className="text-muted small d-block" style={{ fontSize: "11px", textTransform: "uppercase" }}>Coupon Value</span>
+                          <span className="fw-bold text-dark fs-5">₹{val}</span>
+                        </div>
+                        <div className="text-end">
+                          <span className="text-muted small d-block" style={{ fontSize: "11px", textTransform: "uppercase" }}>You Pay (25%)</span>
+                          <span className="fw-bold text-warning fs-5">₹{totalPrice}</span>
+                        </div>
+                      </div>
+
+                      {/* Transparent 20% / 5% Breakdown Pill */}
+                      <div className="p-2 rounded-2 mb-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: "12px" }}>
+                        <div className="d-flex justify-content-between text-secondary mb-1">
+                          <span>Owner Payout (20%):</span>
+                          <strong className="text-success">₹{ownerPayout}</strong>
+                        </div>
+                        <div className="d-flex justify-content-between text-secondary">
+                          <span>Convenience & Platform Fee (5%):</span>
+                          <strong className="text-muted">₹{platformFee}</strong>
+                        </div>
+                      </div>
                     </div>
 
-                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: "17px", lineHeight: "1.3" }}>
-                      {coupon.title}
-                    </h5>
-                    {coupon.description && (
-                      <p className="text-muted small mb-3" style={{ fontSize: "13px" }}>
-                        {coupon.description}
-                      </p>
-                    )}
-
-                    {/* Value Badge Box */}
-                    <div className="coupon-ticket-notch mb-3 d-flex align-items-center justify-content-between">
-                      <div>
-                        <span className="text-muted small d-block" style={{ fontSize: "11px", textTransform: "uppercase" }}>Coupon Value</span>
-                        <span className="fw-bold text-dark fs-5">₹{coupon.coupon_value || 0}</span>
-                      </div>
-                      <div className="text-end">
-                        <span className="text-muted small d-block" style={{ fontSize: "11px", textTransform: "uppercase" }}>Owner Reward</span>
-                        <span className="fw-bold text-primary fs-5">₹{coupon.reward_amount || 0}</span>
-                      </div>
-                    </div>
+                    <button
+                      className="btn btn-primary w-100 py-2 mt-2"
+                      onClick={() => requestCoupon(coupon.id)}
+                    >
+                      Request & Pay ₹{totalPrice}
+                    </button>
                   </div>
-
-                  <button
-                    className="btn btn-primary w-100 py-2 mt-2"
-                    onClick={() => requestCoupon(coupon.id)}
-                  >
-                    Request Coupon
-                  </button>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         }
 
       </div>
