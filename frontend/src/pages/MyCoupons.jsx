@@ -227,140 +227,125 @@ const [expiryDate, setExpiryDate] = useState("");
 
       <hr />
 
-      <div className="card p-4 mb-4">
-
-        <div className="d-flex align-items-center justify-content-between mb-3">
-          <h3 className="mb-0">
-            Create Coupon
-          </h3>
+      <div className="card p-4 mb-4 border-0 shadow-sm" style={{ borderRadius: "16px", border: "1px solid #e2e8f0" }}>
+        <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style={{ borderColor: "#f1f5f9" }}>
+          <div>
+            <h4 className="fw-bold mb-0 text-dark" style={{ fontSize: "19px" }}>
+              Add New Coupon 🎟️
+            </h4>
+            <p className="text-muted small mb-0">
+              Store your vouchers or prepare them for sharing with friends
+            </p>
+          </div>
           {(title || sourceApp) && (
-            <div className="d-flex align-items-center gap-2">
+            <div className="d-flex align-items-center gap-2 bg-light px-3 py-1 rounded-pill">
               <span className="text-muted small">Brand detected:</span>
-              <CouponLogo title={title} sourceApp={sourceApp} description={description} size={36} />
+              <CouponLogo title={title} sourceApp={sourceApp} description={description} size={32} />
             </div>
           )}
         </div>
 
-        <input
-          className="form-control mb-2"
-          placeholder="Title"
-          value={title}
-          onChange={(e) =>
-            setTitle(
-              e.target.value
-            )
-          }
-        />
+        <div className="row g-3">
+          <div className="col-12 col-md-6">
+            <label className="form-label fw-semibold small text-secondary">Coupon Title *</label>
+            <input
+              className="form-control"
+              placeholder="e.g. PhonePe Flat 50 Cashback"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
 
-        <input
-          className="form-control mb-2"
-          placeholder="Description"
-          value={description}
-          onChange={(e) =>
-            setDescription(
-              e.target.value
-            )
-          }
-        />
+          <div className="col-12 col-md-6">
+            <label className="form-label fw-semibold small text-secondary">Source Brand / App *</label>
+            <input
+              className="form-control"
+              placeholder="e.g. PhonePe, Amazon, Swiggy, RedBus..."
+              value={sourceApp}
+              onChange={(e) => setSourceApp(e.target.value)}
+            />
+          </div>
 
-        <input
-          className="form-control mb-2"
-          placeholder="Source App"
-          value={sourceApp}
-          onChange={(e) =>
-            setSourceApp(
-              e.target.value
-            )
-          }
-        />
+          <div className="col-12">
+            <label className="form-label fw-semibold small text-secondary">Description</label>
+            <input
+              className="form-control"
+              placeholder="Brief description or terms of offer"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
 
-        <input
-          className="form-control mb-2"
-          placeholder="Coupon Code"
-          value={couponCode}
-          onChange={(e) =>
-            setCouponCode(
-              e.target.value
-            )
-          }
-        />
-<input
-  type="number"
-  className="form-control mb-2"
-  placeholder="Coupon Value (₹)"
-  value={couponValue}
-  onChange={(e) =>
-    setCouponValue(
-      e.target.value
-    )
-  }
-/>
-        <input
-          type="date"
-          className="form-control mb-3"
-          value={expiryDate}
-          onChange={(e) =>
-            setExpiryDate(
-              e.target.value
-            )
-          }
-        />
+          <div className="col-12 col-md-4">
+            <label className="form-label fw-semibold small text-secondary">Coupon Code *</label>
+            <input
+              className="form-control"
+              placeholder="e.g. SAVE50"
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value)}
+            />
+          </div>
 
-        <button
-          className="btn btn-primary"
-          onClick={createCoupon}
-        >
-          Create Coupon
-        </button>
+          <div className="col-12 col-md-4">
+            <label className="form-label fw-semibold small text-secondary">Coupon Value (₹)</label>
+            <input
+              type="number"
+              className="form-control"
+              placeholder="e.g. 50"
+              value={couponValue}
+              onChange={(e) => setCouponValue(e.target.value)}
+            />
+          </div>
 
+          <div className="col-12 col-md-4">
+            <label className="form-label fw-semibold small text-secondary">Expiry Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={expiryDate}
+              onChange={(e) => setExpiryDate(e.target.value)}
+            />
+          </div>
+
+          <div className="col-12 text-end pt-2">
+            <button
+              className="btn btn-primary px-4 py-2"
+              onClick={createCoupon}
+            >
+              + Create Coupon
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="card p-3 mb-4">
-
-        <h4>
-          Search & Filters
-        </h4>
-
-        <input
-          className="form-control mb-2"
-          placeholder="Search Coupon"
-          onChange={(e) =>
-            setSearch(
-              e.target.value
-            )
-          }
-        />
-
-        <select
-          className="form-select"
-          onChange={(e) =>
-            setSourceFilter(
-              e.target.value
-            )
-          }
-        >
-
-          <option value="">
-            All Sources
-          </option>
-
-          {
-            uniqueSources.map(
-              (source) => (
-
-                <option
-                  key={source}
-                  value={source}
-                >
+      <div className="card p-3 mb-4 border-0 shadow-sm" style={{ borderRadius: "14px", border: "1px solid #e2e8f0" }}>
+        <div className="row g-2 align-items-center">
+          <div className="col-12 col-md-8">
+            <div className="input-group">
+              <span className="input-group-text bg-white border-end-0 text-muted">🔍</span>
+              <input
+                className="form-control border-start-0"
+                placeholder="Search coupons by title or code..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="col-12 col-md-4">
+            <select
+              className="form-select"
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+            >
+              <option value="">All Brands & Apps</option>
+              {uniqueSources.map((source) => (
+                <option key={source} value={source}>
                   {source}
                 </option>
-
-              )
-            )
-          }
-
-        </select>
-
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="d-flex align-items-center justify-content-between mb-3">
