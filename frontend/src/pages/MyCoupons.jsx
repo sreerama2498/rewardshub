@@ -3,6 +3,7 @@ import api from "../services/api";
 
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/LoadingSpinner";
+import CouponLogo from "../components/CouponLogo";
 
 import { toast } from "react-toastify";
 
@@ -228,9 +229,17 @@ const [expiryDate, setExpiryDate] = useState("");
 
       <div className="card p-4 mb-4">
 
-        <h3>
-          Create Coupon
-        </h3>
+        <div className="d-flex align-items-center justify-content-between mb-3">
+          <h3 className="mb-0">
+            Create Coupon
+          </h3>
+          {(title || sourceApp) && (
+            <div className="d-flex align-items-center gap-2">
+              <span className="text-muted small">Brand detected:</span>
+              <CouponLogo title={title} sourceApp={sourceApp} description={description} size={36} />
+            </div>
+          )}
+        </div>
 
         <input
           className="form-control mb-2"
@@ -393,9 +402,17 @@ const [expiryDate, setExpiryDate] = useState("");
                     className="card-body"
                   >
 
-                    <h4>
-                      {coupon.title}
-                    </h4>
+                    <div className="d-flex align-items-center gap-3 mb-2">
+                      <CouponLogo
+                        title={coupon.title}
+                        sourceApp={coupon.source_app}
+                        description={coupon.description}
+                        size={42}
+                      />
+                      <h4 className="mb-0">
+                        {coupon.title}
+                      </h4>
+                    </div>
 
                     <p>
                       {

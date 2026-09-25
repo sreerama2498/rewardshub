@@ -4,6 +4,7 @@ import api from "../services/api";
 
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/LoadingSpinner";
+import CouponLogo from "../components/CouponLogo";
 
 import { toast } from "react-toastify";
 
@@ -691,11 +692,17 @@ export default function AdminPanel() {
                             "
                           >
 
-                            <h5>
-                              {
-                                coupon.title
-                              }
-                            </h5>
+                            <div className="d-flex align-items-center gap-2 mb-1">
+                              <CouponLogo
+                                title={coupon.title}
+                                size={28}
+                              />
+                              <h5 className="mb-0">
+                                {
+                                  coupon.title
+                                }
+                              </h5>
+                            </div>
 
                             <p>
                               {

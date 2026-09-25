@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 
 import Navbar from "../components/Navbar";
+import CouponLogo from "../components/CouponLogo";
 
 import { toast } from "react-toastify";
 
@@ -158,9 +159,17 @@ export default function Marketplace() {
 
                   <div className="card-body">
 
-                    <h5>
-                      {coupon.title}
-                    </h5>
+                    <div className="d-flex align-items-center gap-2 mb-2">
+                      <CouponLogo
+                        title={coupon.title}
+                        sourceApp={coupon.source_app}
+                        description={coupon.description}
+                        size={36}
+                      />
+                      <h5 className="mb-0">
+                        {coupon.title}
+                      </h5>
+                    </div>
 
                     <p>
                       {coupon.description}

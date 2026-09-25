@@ -4,6 +4,7 @@ import api from "../services/api";
 
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/LoadingSpinner";
+import CouponLogo from "../components/CouponLogo";
 
 export default function SentShares() {
 
@@ -109,11 +110,17 @@ export default function SentShares() {
                     "
                   >
 
-                    <h5>
-                      {
-                        share.coupon_title
-                      }
-                    </h5>
+                    <div className="d-flex align-items-center gap-2 mb-2">
+                      <CouponLogo
+                        title={share.coupon_title}
+                        size={32}
+                      />
+                      <h5 className="mb-0">
+                        {
+                          share.coupon_title
+                        }
+                      </h5>
+                    </div>
 
                     <p>
 
