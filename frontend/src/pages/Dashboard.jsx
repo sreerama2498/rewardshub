@@ -273,7 +273,14 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div className="d-flex align-items-center gap-2">
+            <div className="d-flex align-items-center flex-wrap gap-2">
+              <button
+                className="btn btn-outline-light fw-bold"
+                onClick={() => navigate("/profile")}
+                title="Manage UPI & Bank Details"
+              >
+                💳 {user.upi_id || user.bank_account_number ? "Payouts Active" : "Setup UPI & Bank"}
+              </button>
               <button
                 className="btn btn-light fw-bold"
                 onClick={() => navigate("/my-coupons")}

@@ -3,7 +3,7 @@ from fastapi import Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from app.schemas.profile import (ProfileUpdate,PasswordChange)
+from app.schemas.profile import (ProfileUpdate, PasswordChange, PaymentDetailsUpdate)
 from app.database.connection import engine
 from app.database.base import Base
 from app.models.audit_log import AuditLog
@@ -214,7 +214,11 @@ def get_me(
         "id": current_user.id,
         "name": current_user.name,
         "email": current_user.email,
-        "role": current_user.role
+        "role": current_user.role,
+        "upi_id": current_user.upi_id,
+        "bank_account_number": current_user.bank_account_number,
+        "bank_ifsc": current_user.bank_ifsc,
+        "bank_name": current_user.bank_name
     }
 
 
@@ -657,6 +661,10 @@ def get_profile(
         "id": current_user.id,
         "name": current_user.name,
         "email": current_user.email,
+        "upi_id": current_user.upi_id,
+        "bank_account_number": current_user.bank_account_number,
+        "bank_ifsc": current_user.bank_ifsc,
+        "bank_name": current_user.bank_name,
         "created_at": current_user.created_at
     }
 
@@ -689,6 +697,14 @@ def update_profile(
 
     current_user.name = profile.name
     current_user.email = profile.email
+    if profile.upi_id is not None:
+        current_user.upi_id = profile.upi_id
+    if profile.bank_account_number is not None:
+        current_user.bank_account_number = profile.bank_account_number
+    if profile.bank_ifsc is not None:
+        current_user.bank_ifsc = profile.bank_ifsc
+    if profile.bank_name is not None:
+        current_user.bank_name = profile.bank_name
 
     db.commit()
 
@@ -701,6 +717,35 @@ def update_profile(
 
     return {
         "message": "Profile updated successfully"
+    }
+
+
+# -------------------------
+# UPDATE PAYMENT DETAILS
+# -------------------------
+
+@app.put("/payment-details")
+def update_payment_details(
+    details: PaymentDetailsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    current_user.upi_id = details.upi_id
+    current_user.bank_account_number = details.bank_account_number
+    current_user.bank_ifsc = details.bank_ifsc
+    current_user.bank_name = details.bank_name
+
+    db.commit()
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "UPDATE_PAYMENT_DETAILS",
+        f"UPI: {details.upi_id or 'None'}, Bank: {details.bank_name or 'None'}"
+    )
+
+    return {
+        "message": "Payment and banking details updated successfully"
     }
 
 

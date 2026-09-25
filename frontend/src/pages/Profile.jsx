@@ -9,6 +9,15 @@ export default function Profile() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [createdAt, setCreatedAt] = useState("");
+
+  // Payment / Settlement Details
+  const [upiId, setUpiId] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankIfsc, setBankIfsc] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [updatingPayment, setUpdatingPayment] = useState(false);
+
+  // Security Credentials
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -25,6 +34,10 @@ export default function Profile() {
       setName(response.data.name || "");
       setEmail(response.data.email || "");
       setCreatedAt(response.data.created_at || "");
+      setUpiId(response.data.upi_id || "");
+      setBankAccountNumber(response.data.bank_account_number || "");
+      setBankIfsc(response.data.bank_ifsc || "");
+      setBankName(response.data.bank_name || "");
     } catch (error) {
       console.error(error);
       toast.error("Failed to load profile");
@@ -48,6 +61,25 @@ export default function Profile() {
       toast.error("Profile update failed");
     } finally {
       setUpdatingProfile(false);
+    }
+  };
+
+  const updatePaymentDetails = async (e) => {
+    if (e) e.preventDefault();
+    setUpdatingPayment(true);
+    try {
+      const response = await api.put("/payment-details", {
+        upi_id: upiId,
+        bank_account_number: bankAccountNumber,
+        bank_ifsc: bankIfsc,
+        bank_name: bankName
+      });
+      toast.success(response.data.message || "Payout details saved successfully!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update payout details");
+    } finally {
+      setUpdatingPayment(false);
     }
   };
 
@@ -93,6 +125,8 @@ export default function Profile() {
     ? name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()
     : "U";
 
+  const hasPayoutConfigured = Boolean(upiId || bankAccountNumber);
+
   return (
     <div className="container mt-4 mb-5">
       <Navbar />
@@ -119,7 +153,18 @@ export default function Profile() {
               {initials}
             </div>
             <div>
-              <h3 className="fw-bold mb-1 text-white">{name}</h3>
+              <div className="d-flex align-items-center gap-2 mb-1">
+                <h3 className="fw-bold mb-0 text-white">{name}</h3>
+                {hasPayoutConfigured ? (
+                  <span className="badge bg-success text-white px-2 py-1 rounded-pill small">
+                    ✓ Payouts Ready
+                  </span>
+                ) : (
+                  <span className="badge bg-warning text-dark px-2 py-1 rounded-pill small">
+                    ⚠️ Setup Banking Details
+                  </span>
+                )}
+              </div>
               <p className="text-white-50 mb-0 small">{email}</p>
             </div>
           </div>
@@ -132,14 +177,15 @@ export default function Profile() {
       </div>
 
       <div className="row g-4">
-        {/* Left Column: Personal Information */}
-        <div className="col-12 col-lg-6">
-          <div className="card h-100 p-4 shadow-sm border-0" style={{ borderRadius: "16px", border: "1px solid #e2e8f0" }}>
+        {/* Left Column: Personal Information & Password */}
+        <div className="col-12 col-lg-6 d-flex flex-column gap-4">
+          {/* Personal Information */}
+          <div className="card p-4 shadow-sm border-0" style={{ borderRadius: "16px", border: "1px solid #e2e8f0" }}>
             <h4 className="fw-bold text-dark mb-1" style={{ fontSize: "19px" }}>
-              Personal Information 👤
+              Personal Profile 👤
             </h4>
             <p className="text-muted small mb-4">
-              Update your account details and contact email
+              Update your basic display information and primary contact email
             </p>
 
             <form onSubmit={updateProfile}>
@@ -173,20 +219,18 @@ export default function Profile() {
                 className="btn btn-primary w-100 py-2"
                 disabled={updatingProfile}
               >
-                {updatingProfile ? "Saving Changes..." : "Save Profile Details"}
+                {updatingProfile ? "Saving Profile..." : "Save Profile Details"}
               </button>
             </form>
           </div>
-        </div>
 
-        {/* Right Column: Security & Password */}
-        <div className="col-12 col-lg-6">
-          <div className="card h-100 p-4 shadow-sm border-0" style={{ borderRadius: "16px", border: "1px solid #e2e8f0" }}>
+          {/* Security & Password */}
+          <div className="card p-4 shadow-sm border-0" style={{ borderRadius: "16px", border: "1px solid #e2e8f0" }}>
             <h4 className="fw-bold text-dark mb-1" style={{ fontSize: "19px" }}>
               Security & Credentials 🔒
             </h4>
             <p className="text-muted small mb-4">
-              Change your password to keep your reward coupons safe
+              Change your password to secure account operations
             </p>
 
             <form onSubmit={changePassword}>
@@ -234,10 +278,100 @@ export default function Profile() {
 
               <button
                 type="submit"
-                className="btn btn-warning w-100 py-2 text-white fw-bold"
+                className="btn btn-outline-secondary w-100 py-2 fw-bold"
                 disabled={updatingPassword}
               >
                 {updatingPassword ? "Updating Password..." : "Update Password"}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Right Column: Business Banking & UPI Details */}
+        <div className="col-12 col-lg-6">
+          <div className="card h-100 p-4 shadow-sm border-0" style={{ borderRadius: "16px", border: "1px solid #e2e8f0" }}>
+            <div className="d-flex align-items-center justify-content-between mb-1">
+              <h4 className="fw-bold text-dark mb-0" style={{ fontSize: "19px" }}>
+                Payout & Banking Accounts 💳
+              </h4>
+              <span className="badge-soft badge-soft-success">Verified Settlement</span>
+            </div>
+            <p className="text-muted small mb-4">
+              Add your UPI VPA and Bank account details to receive reward redemptions and marketplace payouts
+            </p>
+
+            <form onSubmit={updatePaymentDetails}>
+              {/* UPI ID Section */}
+              <div className="mb-4 p-3 rounded-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                <div className="d-flex align-items-center gap-2 mb-2">
+                  <span style={{ fontSize: "20px" }}>⚡</span>
+                  <label className="form-label fw-bold text-dark mb-0">
+                    Instant UPI Virtual Payment Address (VPA)
+                  </label>
+                </div>
+                <input
+                  className="form-control"
+                  placeholder="e.g. yourname@okhdfcbank or 9876543210@paytm"
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                />
+                <span className="text-muted small d-block mt-1" style={{ fontSize: "12px" }}>
+                  Used for instant 1-click cashback & marketplace reward payouts
+                </span>
+              </div>
+
+              {/* Direct Bank Account Section */}
+              <div className="mb-4 p-3 rounded-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                <div className="d-flex align-items-center gap-2 mb-3">
+                  <span style={{ fontSize: "20px" }}>🏦</span>
+                  <label className="form-label fw-bold text-dark mb-0">
+                    Direct Bank Account Details
+                  </label>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold small text-secondary">
+                    Bank Name
+                  </label>
+                  <input
+                    className="form-control"
+                    placeholder="e.g. HDFC Bank, ICICI Bank, State Bank of India"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold small text-secondary">
+                    Account Number
+                  </label>
+                  <input
+                    className="form-control"
+                    placeholder="e.g. 50100234567890"
+                    value={bankAccountNumber}
+                    onChange={(e) => setBankAccountNumber(e.target.value)}
+                  />
+                </div>
+
+                <div className="mb-2">
+                  <label className="form-label fw-semibold small text-secondary">
+                    Bank IFSC Code
+                  </label>
+                  <input
+                    className="form-control text-uppercase"
+                    placeholder="e.g. HDFC0001234"
+                    value={bankIfsc}
+                    onChange={(e) => setBankIfsc(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary w-100 py-2 fs-6"
+                disabled={updatingPayment}
+              >
+                {updatingPayment ? "Saving Payout Details..." : "💾 Save Payout & Banking Details"}
               </button>
             </form>
           </div>

@@ -42,6 +42,26 @@ class User(Base):
         nullable=False
     )
 
+    upi_id = Column(
+        String,
+        nullable=True
+    )
+
+    bank_account_number = Column(
+        String,
+        nullable=True
+    )
+
+    bank_ifsc = Column(
+        String,
+        nullable=True
+    )
+
+    bank_name = Column(
+        String,
+        nullable=True
+    )
+
     created_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc)
