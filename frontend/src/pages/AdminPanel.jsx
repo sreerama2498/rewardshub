@@ -14,6 +14,7 @@ export default function AdminPanel() {
   const [dashboardView, setDashboardView] = useState("ALL");
   const [search, setSearch] = useState("");
   const [selectedCoupons, setSelectedCoupons] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [transactions, setTransactions] = useState([]);
 
   const filteredLogs =
@@ -48,8 +49,8 @@ export default function AdminPanel() {
 
   const viewCoupons = async (userId, userName) => {
     try {
-      const response = await api.get(`/admin/user/${userId}/coupons`);
-      setSelectedCoupons(response.data);
+      const response = await api.get(`/admin/user-coupons/${userId}`);
+      setSelectedCoupons(Array.isArray(response.data) ? response.data : []);
       setSelectedUser(userName);
     } catch (error) {
       console.error(error);

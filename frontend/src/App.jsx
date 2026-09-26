@@ -15,14 +15,15 @@ import Profile from "./pages/Profile";
 import AdminPanel from "./pages/AdminPanel";
 import Notifications from "./pages/Notifications";
 import Marketplace from "./pages/Marketplace";
-import ProtectedRoute
-  from "./routes/ProtectedRoute";
+import ProtectedRoute from "./routes/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
 
   return (
 
-    <BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
 
       <Routes>
 
@@ -118,6 +119,7 @@ function App() {
       </Routes>
 
     </BrowserRouter>
+  </ErrorBoundary>
 
   );
 

@@ -901,6 +901,7 @@ def admin_users(
     ]
 
 
+@app.get("/admin/user/{user_id}/coupons")
 @app.get("/admin/user-coupons/{user_id}")
 def admin_user_coupons(
     user_id: int,
