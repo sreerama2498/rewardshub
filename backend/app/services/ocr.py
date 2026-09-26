@@ -70,7 +70,9 @@ def verify_coupon_screenshot(
     if len(raw_text) > 20:
         confidence += 5.0
 
-    is_verified = (confidence >= 45.0)
+    # Both brand and code must be present in the screenshot for verification to pass.
+    # Brand-only is insufficient — a user could upload any brand page without a real code.
+    is_verified = brand_matched and code_matched
 
     # Preview snippet of extracted text (clean up whitespace)
     snippet = " ".join(raw_text.split()[:40])

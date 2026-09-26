@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 
@@ -24,5 +24,12 @@ class PasswordChange(BaseModel):
 
 
 class TopupRequest(BaseModel):
-    amount: float
+    # Minimum ₹1, maximum ₹50,000 per top-up to prevent abuse
+    amount: float = Field(gt=0, le=50000)
+
+    @field_validator("amount")
+    @classmethod
+    def round_to_paise(cls, v: float) -> float:
+        """Prevent floating-point drift by capping precision at 2 decimal places."""
+        return round(v, 2)
 

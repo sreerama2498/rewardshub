@@ -89,10 +89,16 @@ def create_notification(
     db.commit()
 
 
-app = FastAPI(
-    title="RewardsHub API"
-)
 import os as _os
+_environment = _os.getenv("ENVIRONMENT", "development").lower()
+_is_production = _environment == "production"
+
+app = FastAPI(
+    title="RewardsHub API",
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json"
+)
 _cors_origins = _os.getenv(
     "CORS_ORIGINS",
     "http://localhost:5173,http://localhost:5174"
@@ -508,7 +514,7 @@ def get_users(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    users = db.query(User).all()
+    users = db.query(User).filter(User.is_active == True).all()
 
     return [
         {
@@ -527,7 +533,6 @@ def get_sent_shares(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-
     shares = (
         db.query(CouponShare)
         .filter(
@@ -536,25 +541,24 @@ def get_sent_shares(
         .all()
     )
 
+    if not shares:
+        return []
+
+    coupon_ids = {share.coupon_id for share in shares if share.coupon_id}
+    receiver_ids = {share.receiver_id for share in shares if share.receiver_id}
+
+    coupons_by_id = {
+        c.id: c for c in db.query(Coupon).filter(Coupon.id.in_(coupon_ids)).all()
+    } if coupon_ids else {}
+
+    receivers_by_id = {
+        u.id: u for u in db.query(User).filter(User.id.in_(receiver_ids)).all()
+    } if receiver_ids else {}
+
     results = []
-
     for share in shares:
-
-        coupon = (
-            db.query(Coupon)
-            .filter(
-                Coupon.id == share.coupon_id
-            )
-            .first()
-        )
-
-        receiver = (
-            db.query(User)
-            .filter(
-                User.id == share.receiver_id
-            )
-            .first()
-        )
+        coupon = coupons_by_id.get(share.coupon_id)
+        receiver = receivers_by_id.get(share.receiver_id)
 
         results.append({
             "id": share.id,
@@ -660,29 +664,24 @@ def expiry_dashboard(
 
 @app.get("/activity")
 def get_activity(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-
-    coupons = db.query(Coupon).all()
-
-    activities = []
-
-    for coupon in coupons:
-
-        activities.append(
-            {
-                "type": "Coupon Created",
-                "title": coupon.title,
-                "created_at": coupon.created_at
-            }
-        )
-
-    activities.sort(
-        key=lambda x: x["created_at"],
-        reverse=True
+    coupons = (
+        db.query(Coupon)
+        .order_by(Coupon.created_at.desc())
+        .limit(10)
+        .all()
     )
 
-    return activities[:10]
+    return [
+        {
+            "type": "Coupon Created",
+            "title": coupon.title,
+            "created_at": coupon.created_at
+        }
+        for coupon in coupons
+    ]
 
 
 # -------------------------
@@ -1294,11 +1293,11 @@ def request_coupon(
     db: Session = Depends(get_db)
 ):
 
+    # Row-lock the coupon to prevent concurrent purchase race conditions
     coupon = (
         db.query(Coupon)
-        .filter(
-            Coupon.id == coupon_id
-        )
+        .filter(Coupon.id == coupon_id)
+        .with_for_update()
         .first()
     )
 
@@ -1325,14 +1324,23 @@ def request_coupon(
     owner_payout = round(val * 0.20, 2)
     platform_fee = round(val * 0.05, 2)
 
-    # Check buyer balance
-    if current_user.wallet_balance is None:
-        current_user.wallet_balance = 1000.0
+    # Row-lock buyer user to prevent double-spending race condition
+    buyer = (
+        db.query(User)
+        .filter(User.id == current_user.id)
+        .with_for_update()
+        .first()
+    )
+    if not buyer:
+        raise HTTPException(status_code=404, detail="Buyer account not found")
 
-    if current_user.wallet_balance < total_price:
+    if buyer.wallet_balance is None:
+        buyer.wallet_balance = 1000.0
+
+    if buyer.wallet_balance < total_price:
         raise HTTPException(
             status_code=400,
-            detail=f"Insufficient wallet balance (₹{current_user.wallet_balance:.2f}). You need ₹{total_price:.2f}. Please add funds to your wallet."
+            detail=f"Insufficient wallet balance (₹{buyer.wallet_balance:.2f}). You need ₹{total_price:.2f}. Please add funds to your wallet."
         )
 
     owner = db.query(User).filter(User.id == coupon.owner_id).first()
@@ -1342,11 +1350,16 @@ def request_coupon(
             detail="Coupon owner not found"
         )
 
-    # 1. Deduct 25% from buyer's account
-    current_user.wallet_balance = round(current_user.wallet_balance - total_price, 2)
+    # 1. Deduct 25% from buyer's account atomically
+    buyer.wallet_balance = round(buyer.wallet_balance - total_price, 2)
 
     # 2. Credit platform fee 5% to platform treasury
-    platform_acc = db.query(PlatformAccount).filter(PlatformAccount.id == 1).first()
+    platform_acc = (
+        db.query(PlatformAccount)
+        .filter(PlatformAccount.id == 1)
+        .with_for_update()
+        .first()
+    )
     if not platform_acc:
         platform_acc = PlatformAccount(
             id=1,
@@ -1368,7 +1381,7 @@ def request_coupon(
     transaction = Transaction(
         transaction_id=txn_ref,
         coupon_id=coupon.id,
-        buyer_id=current_user.id,
+        buyer_id=buyer.id,
         owner_id=owner.id,
         total_amount=total_price,
         owner_payout=owner_payout,
@@ -1382,7 +1395,7 @@ def request_coupon(
     # 4. Record request with ESCROW_HOLD status
     request = CouponRequest(
         coupon_id=coupon.id,
-        buyer_id=current_user.id,
+        buyer_id=buyer.id,
         owner_id=coupon.owner_id,
         total_price=total_price,
         owner_payout=owner_payout,
@@ -1393,8 +1406,8 @@ def request_coupon(
 
     # 5. Transfer coupon to buyer with IN_ESCROW status
     coupon.seller_id = coupon.owner_id
-    coupon.buyer_id = current_user.id
-    coupon.owner_id = current_user.id
+    coupon.buyer_id = buyer.id
+    coupon.owner_id = buyer.id
     coupon.escrow_status = "IN_ESCROW"
     coupon.status = "ACQUIRED_IN_ESCROW"
 
@@ -1404,12 +1417,12 @@ def request_coupon(
         db,
         owner.id,
         "🔒 Payout Secured in Escrow",
-        f"Buyer {current_user.name} paid ₹{total_price:.2f} for '{coupon.title}'. Your ₹{owner_payout:.2f} payout is held safely in RewardsHub Escrow and will be released upon buyer confirmation."
+        f"Buyer {buyer.name} paid ₹{total_price:.2f} for '{coupon.title}'. Your ₹{owner_payout:.2f} payout is held safely in RewardsHub Escrow and will be released upon buyer confirmation."
     )
 
     create_notification(
         db,
-        current_user.id,
+        buyer.id,
         "🛡️ Buyer Protection Active (In Escrow)",
         f"Paid ₹{total_price:.2f}. Coupon '{coupon.title}' is now in My Coupons! Code: {coupon.coupon_code}. Funds are held in Escrow: test the code and click 'Verify & Redeem' or 'Report Issue' for a 100% refund."
     )
@@ -1417,7 +1430,7 @@ def request_coupon(
     # 7. Audit log
     create_audit_log(
         db,
-        current_user.id,
+        buyer.id,
         "MARKETPLACE_ESCROW_PURCHASE",
         f"{txn_ref}: Purchased '{coupon.title}' for ₹{total_price} [Escrow Hold: ₹{owner_payout} to {owner.email}]"
     )
@@ -1432,7 +1445,7 @@ def request_coupon(
         "total_price": total_price,
         "owner_payout": owner_payout,
         "platform_fee": platform_fee,
-        "wallet_balance": current_user.wallet_balance,
+        "wallet_balance": buyer.wallet_balance,
         "escrow_status": "IN_ESCROW"
     }
 
@@ -1447,17 +1460,22 @@ def confirm_redeem(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    coupon = db.query(Coupon).filter(Coupon.id == coupon_id).first()
+    coupon = (
+        db.query(Coupon)
+        .filter(Coupon.id == coupon_id)
+        .with_for_update()
+        .first()
+    )
     if not coupon:
         raise HTTPException(status_code=404, detail="Coupon not found")
 
-    if coupon.buyer_id != current_user.id and coupon.owner_id != current_user.id:
+    if coupon.buyer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the coupon buyer can confirm redemption")
 
     if coupon.escrow_status != "IN_ESCROW":
         raise HTTPException(status_code=400, detail="This coupon is not currently held in escrow")
 
-    # Find the active escrow transaction
+    # Find the active escrow transaction with lock
     txn = (
         db.query(Transaction)
         .filter(
@@ -1465,6 +1483,7 @@ def confirm_redeem(
             Transaction.buyer_id == current_user.id,
             Transaction.status == "ESCROW_HOLD"
         )
+        .with_for_update()
         .order_by(Transaction.id.desc())
         .first()
     )
@@ -1472,7 +1491,12 @@ def confirm_redeem(
     if not txn:
         raise HTTPException(status_code=400, detail="No active escrow transaction found for this coupon")
 
-    seller = db.query(User).filter(User.id == txn.owner_id).first()
+    seller = (
+        db.query(User)
+        .filter(User.id == txn.owner_id)
+        .with_for_update()
+        .first()
+    )
     if not seller:
         raise HTTPException(status_code=404, detail="Coupon seller not found")
 
@@ -1529,11 +1553,16 @@ def dispute_refund(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    coupon = db.query(Coupon).filter(Coupon.id == coupon_id).first()
+    coupon = (
+        db.query(Coupon)
+        .filter(Coupon.id == coupon_id)
+        .with_for_update()
+        .first()
+    )
     if not coupon:
         raise HTTPException(status_code=404, detail="Coupon not found")
 
-    if coupon.buyer_id != current_user.id and coupon.owner_id != current_user.id:
+    if coupon.buyer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the coupon buyer can dispute this purchase")
 
     if coupon.escrow_status != "IN_ESCROW":
@@ -1546,6 +1575,7 @@ def dispute_refund(
             Transaction.buyer_id == current_user.id,
             Transaction.status == "ESCROW_HOLD"
         )
+        .with_for_update()
         .order_by(Transaction.id.desc())
         .first()
     )
@@ -1556,12 +1586,27 @@ def dispute_refund(
     seller = db.query(User).filter(User.id == txn.owner_id).first()
 
     # 100% Instant Refund back to buyer's wallet!
-    current_user.wallet_balance = round((current_user.wallet_balance or 0.0) + txn.total_amount, 2)
+    buyer = (
+        db.query(User)
+        .filter(User.id == current_user.id)
+        .with_for_update()
+        .first()
+    )
+    if not buyer:
+        raise HTTPException(status_code=404, detail="Buyer account not found")
 
-    # Reverse platform fee
-    platform_acc = db.query(PlatformAccount).filter(PlatformAccount.id == 1).first()
-    if platform_acc and platform_acc.balance and platform_acc.balance >= txn.platform_fee:
-        platform_acc.balance = round(platform_acc.balance - txn.platform_fee, 2)
+    buyer.wallet_balance = round((buyer.wallet_balance or 0.0) + txn.total_amount, 2)
+
+    # Reverse platform fee and volume from treasury
+    platform_acc = (
+        db.query(PlatformAccount)
+        .filter(PlatformAccount.id == 1)
+        .with_for_update()
+        .first()
+    )
+    if platform_acc:
+        platform_acc.balance = round(max(0.0, (platform_acc.balance or 0.0) - txn.platform_fee), 2)
+        platform_acc.total_volume = round(max(0.0, (platform_acc.total_volume or 0.0) - txn.total_amount), 2)
 
     # Mark transaction as REFUNDED
     txn.status = "REFUNDED"
@@ -1574,8 +1619,8 @@ def dispute_refund(
     refund_txn = Transaction(
         transaction_id=f"REFUND-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}",
         coupon_id=coupon.id,
-        buyer_id=current_user.id,
-        owner_id=current_user.id,
+        buyer_id=buyer.id,
+        owner_id=buyer.id,
         total_amount=txn.total_amount,
         owner_payout=txn.total_amount,
         platform_fee=0.0,
@@ -1586,7 +1631,7 @@ def dispute_refund(
 
     create_notification(
         db,
-        current_user.id,
+        buyer.id,
         "💰 100% Refund Credited!",
         f"₹{txn.total_amount:.2f} has been refunded to your RewardsHub wallet for invalid coupon '{coupon.title}'. Reason: {req.reason}."
     )
@@ -1601,7 +1646,7 @@ def dispute_refund(
 
     create_audit_log(
         db,
-        current_user.id,
+        buyer.id,
         "BUYER_DISPUTE_REFUND",
         f"Refunded ₹{txn.total_amount} for '{coupon.title}'. Reason: {req.reason}"
     )
@@ -1611,7 +1656,7 @@ def dispute_refund(
     return {
         "message": f"Dispute approved under Buyer Protection Guarantee! ₹{txn.total_amount:.2f} refunded to your wallet.",
         "refund_amount": txn.total_amount,
-        "wallet_balance": current_user.wallet_balance,
+        "wallet_balance": buyer.wallet_balance,
         "escrow_status": "REFUNDED",
         "status": "DISPUTED_INVALID"
     }
@@ -1688,18 +1733,29 @@ def topup_wallet(
 ):
     if req.amount <= 0:
         raise HTTPException(status_code=400, detail="Top-up amount must be greater than 0")
+    if req.amount > 50000:
+        raise HTTPException(status_code=400, detail="Maximum top-up amount is ₹50,000 per transaction")
 
-    if current_user.wallet_balance is None:
-        current_user.wallet_balance = 0.0
+    user = (
+        db.query(User)
+        .filter(User.id == current_user.id)
+        .with_for_update()
+        .first()
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-    current_user.wallet_balance = round(current_user.wallet_balance + req.amount, 2)
+    if user.wallet_balance is None:
+        user.wallet_balance = 0.0
+
+    user.wallet_balance = round(user.wallet_balance + req.amount, 2)
 
     txn_ref = f"TOPUP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
 
     transaction = Transaction(
         transaction_id=txn_ref,
-        buyer_id=current_user.id,
-        owner_id=current_user.id,
+        buyer_id=user.id,
+        owner_id=user.id,
         total_amount=req.amount,
         owner_payout=req.amount,
         platform_fee=0.0,
@@ -1710,23 +1766,23 @@ def topup_wallet(
 
     create_notification(
         db,
-        current_user.id,
+        user.id,
         "💳 Wallet Top-up Successful",
-        f"₹{req.amount:.2f} has been added to your RewardsHub wallet. New balance: ₹{current_user.wallet_balance:.2f}."
+        f"₹{req.amount:.2f} has been added to your RewardsHub wallet. New balance: ₹{user.wallet_balance:.2f}."
     )
 
     create_audit_log(
         db,
-        current_user.id,
+        user.id,
         "WALLET_TOPUP",
-        f"{txn_ref}: Added ₹{req.amount:.2f}. Balance: ₹{current_user.wallet_balance:.2f}"
+        f"{txn_ref}: Added ₹{req.amount:.2f}. Balance: ₹{user.wallet_balance:.2f}"
     )
 
     db.commit()
 
     return {
         "message": f"Successfully added ₹{req.amount:.2f} to wallet",
-        "wallet_balance": current_user.wallet_balance,
+        "wallet_balance": user.wallet_balance,
         "transaction_id": txn_ref
     }
 
@@ -1743,10 +1799,18 @@ def admin_transactions(
     verify_admin(current_user)
 
     txns = db.query(Transaction).order_by(Transaction.created_at.desc()).limit(100).all()
+    if not txns:
+        return []
+
+    user_ids = {t.buyer_id for t in txns if t.buyer_id} | {t.owner_id for t in txns if t.owner_id}
+    users_by_id = {
+        u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
+    } if user_ids else {}
+
     res = []
     for t in txns:
-        buyer = db.query(User).filter(User.id == t.buyer_id).first()
-        owner = db.query(User).filter(User.id == t.owner_id).first()
+        buyer = users_by_id.get(t.buyer_id)
+        owner = users_by_id.get(t.owner_id)
         res.append({
             "id": t.id,
             "transaction_id": t.transaction_id,

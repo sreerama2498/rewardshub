@@ -9,31 +9,36 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Python Syntax & Compilation Check
+        run: |
+          python -m py_compile backend/app/main.py backend/app/services/ocr.py backend/app/core/security.py
 
   deploy:
-
+    needs: validate
     runs-on: ubuntu-latest
-
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Deploy to EC2
-
         uses: appleboy/ssh-action@v1.0.3
-
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-
           script: |
-
             cd ~/rewardshub
-
             git pull origin main
-
             docker compose build
-
             docker compose up -d
