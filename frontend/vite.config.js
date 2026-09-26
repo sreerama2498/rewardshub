@@ -8,6 +8,8 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     allowedHosts: [
+      "rewardshub.sreeramonline.com",
+      "sreeramonline.com",
       "rewardshub.sreeram.site",
       "localhost",
       "127.0.0.1"

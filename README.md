@@ -92,13 +92,13 @@ Availability Monitoring
 ## Deployment URLs
 
 Application:
-https://rewardshub.sreeram.site
+https://rewardshub.sreeramonline.com
 
 Monitoring:
-https://status.sreeram.site
+https://status.sreeramonline.com
 
 Grafana:
-https://grafana.sreeram.site
+https://grafana.sreeramonline.com
 
 ## Security
 
@@ -193,9 +193,9 @@ The following domains are used:
 
 | Service     | Domain                  |
 | ----------- | ----------------------- |
-| RewardsHub  | rewardshub.sreeram.site |
-| Uptime Kuma | status.sreeram.site     |
-| Grafana     | grafana.sreeram.site    |
+| RewardsHub  | rewardshub.sreeramonline.com |
+| Uptime Kuma | status.sreeramonline.com     |
+| Grafana     | grafana.sreeramonline.com    |
 
 ---
 
@@ -267,16 +267,16 @@ curl ifconfig.me
 
 Update DNS records:
 
-* rewardshub.sreeram.site
-* status.sreeram.site
-* grafana.sreeram.site
+* rewardshub.sreeramonline.com
+* status.sreeramonline.com
+* grafana.sreeramonline.com
 
 Verify:
 
 ```bash
-nslookup rewardshub.sreeram.site
-nslookup status.sreeram.site
-nslookup grafana.sreeram.site
+nslookup rewardshub.sreeramonline.com
+nslookup status.sreeramonline.com
+nslookup grafana.sreeramonline.com
 ```
 
 ---
@@ -295,21 +295,21 @@ Generate certificates:
 
 ```bash
 sudo certbot certonly --standalone \
--d rewardshub.sreeram.site
+-d rewardshub.sreeramonline.com
 ```
 
 ## Uptime Kuma
 
 ```bash
 sudo certbot certonly --standalone \
--d status.sreeram.site
+-d status.sreeramonline.com
 ```
 
 ## Grafana
 
 ```bash
 sudo certbot certonly --standalone \
--d grafana.sreeram.site
+-d grafana.sreeramonline.com
 ```
 
 Verify:
@@ -321,9 +321,9 @@ sudo ls /etc/letsencrypt/live
 Expected:
 
 ```text
-rewardshub.sreeram.site
-status.sreeram.site
-grafana.sreeram.site
+rewardshub.sreeramonline.com
+status.sreeramonline.com
+grafana.sreeramonline.com
 ```
 
 ---
@@ -452,7 +452,7 @@ docker restart rewardshub-nginx
 ## RewardsHub
 
 ```bash
-curl -I https://rewardshub.sreeram.site
+curl -I https://rewardshub.sreeramonline.com
 ```
 
 Expected:
@@ -464,7 +464,7 @@ HTTP/1.1 200 OK
 ## Uptime Kuma
 
 ```bash
-curl -I https://status.sreeram.site
+curl -I https://status.sreeramonline.com
 ```
 
 Expected:
@@ -476,7 +476,7 @@ HTTP/1.1 302 Found
 ## Grafana
 
 ```bash
-curl -I https://grafana.sreeram.site
+curl -I https://grafana.sreeramonline.com
 ```
 
 Expected:
