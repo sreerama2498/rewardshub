@@ -268,18 +268,28 @@ export default function Dashboard() {
               <h2 className="text-white fw-bold mb-1" style={{ fontSize: "28px" }}>
                 Welcome back, {user.name}! 👋
               </h2>
-              <p className="text-white-50 mb-0">
+              <p className="text-white-50 mb-3">
                 {user.email} • Track, share, and redeem your rewards effortlessly
               </p>
+              <div className="d-flex align-items-center gap-3">
+                <div className="bg-white bg-opacity-10 px-3 py-1 rounded-3 border border-white border-opacity-20">
+                  <span className="text-white-50 small d-block" style={{ fontSize: "11px" }}>WALLET BALANCE</span>
+                  <span className="fw-bold text-white fs-6">💳 ₹{user.wallet_balance || 0}</span>
+                </div>
+                <div className="bg-white bg-opacity-10 px-3 py-1 rounded-3 border border-white border-opacity-20">
+                  <span className="text-white-50 small d-block" style={{ fontSize: "11px" }}>EARNINGS CREDITED</span>
+                  <span className="fw-bold text-white fs-6">💰 ₹{user.total_earned || 0}</span>
+                </div>
+              </div>
             </div>
 
             <div className="d-flex align-items-center flex-wrap gap-2">
               <button
                 className="btn btn-outline-light fw-bold"
                 onClick={() => navigate("/profile")}
-                title="Manage UPI & Bank Details"
+                title="Manage Wallet, UPI & Bank Details"
               >
-                💳 {user.upi_id || user.bank_account_number ? "Payouts Active" : "Setup UPI & Bank"}
+                💳 Wallet & Banking
               </button>
               <button
                 className="btn btn-light fw-bold"

@@ -14,7 +14,7 @@ export default function AdminPanel() {
   const [dashboardView, setDashboardView] = useState("ALL");
   const [search, setSearch] = useState("");
   const [selectedCoupons, setSelectedCoupons] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [transactions, setTransactions] = useState([]);
 
   const filteredLogs =
     activityFilter === "ALL"
@@ -27,15 +27,17 @@ export default function AdminPanel() {
 
   const loadAdminData = async () => {
     try {
-      const [statsRes, usersRes, logsRes] = await Promise.all([
+      const [statsRes, usersRes, logsRes, txnsRes] = await Promise.all([
         api.get("/admin/stats"),
         api.get("/admin/users"),
-        api.get("/admin/audit-logs")
+        api.get("/admin/audit-logs"),
+        api.get("/admin/transactions").catch(() => ({ data: [] }))
       ]);
 
       setStats(statsRes.data);
       setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
       setLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
+      setTransactions(Array.isArray(txnsRes.data) ? txnsRes.data : []);
     } catch (error) {
       console.error(error);
       toast.error("Failed to load admin telemetry data");
@@ -164,7 +166,46 @@ export default function AdminPanel() {
         ))}
       </div>
 
-      {/* User Management Section */}
+      {/* Platform Treasury & Marketplace Settlement Banner */}
+      <div
+        className="card mb-4 border-0 text-white overflow-hidden shadow-sm"
+        style={{
+          background: "linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)",
+          borderRadius: "16px"
+        }}
+      >
+        <div className="card-body p-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+          <div>
+            <div className="d-flex align-items-center gap-2 mb-1">
+              <span className="badge bg-white text-success fw-bold px-2 py-1 rounded-pill">
+                🏛️ Platform Treasury Account
+              </span>
+              <span className="text-white-50 small">Automated 5% Fee Crediting Active</span>
+            </div>
+            <h3 className="text-white fw-bold mb-1" style={{ fontSize: "22px" }}>
+              Platform Fee Pool & Settlement Treasury
+            </h3>
+            <p className="text-white-50 mb-0 small">
+              Each marketplace coupon transaction automatically credits 20% to the coupon owner and 5% to this platform account.
+            </p>
+          </div>
+
+          <div className="d-flex align-items-center flex-wrap gap-3">
+            <div className="bg-black bg-opacity-25 px-4 py-2 rounded-3 border border-white border-opacity-20 text-center">
+              <span className="text-white-50 small d-block" style={{ fontSize: "11px" }}>PLATFORM FEES COLLECTED (5%)</span>
+              <span className="fw-bold text-white fs-4">₹{stats?.platform_balance || 0}</span>
+            </div>
+            <div className="bg-black bg-opacity-25 px-4 py-2 rounded-3 border border-white border-opacity-20 text-center">
+              <span className="text-white-50 small d-block" style={{ fontSize: "11px" }}>GROSS TRADED VOLUME (25%)</span>
+              <span className="fw-bold text-white fs-4">₹{stats?.total_marketplace_volume || 0}</span>
+            </div>
+            <div className="bg-black bg-opacity-25 px-4 py-2 rounded-3 border border-white border-opacity-20 text-center">
+              <span className="text-white-50 small d-block" style={{ fontSize: "11px" }}>SETTLED TRANSACTIONS</span>
+              <span className="fw-bold text-white fs-4">{stats?.total_marketplace_transactions || 0}</span>
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="card mb-4 border-0 shadow-sm" style={{ borderRadius: "16px", border: "1px solid #e2e8f0" }}>
         <div className="card-body p-4">
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom" style={{ borderColor: "#f1f5f9" }}>
@@ -351,6 +392,83 @@ export default function AdminPanel() {
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Marketplace Settlements & Auto-Payouts Ledger */}
+      <div className="card mb-4 border-0 shadow-sm" style={{ borderRadius: "16px", border: "1px solid #e2e8f0" }}>
+        <div className="card-body p-4">
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom" style={{ borderColor: "#f1f5f9" }}>
+            <div>
+              <div className="d-flex align-items-center gap-2 mb-1">
+                <h4 className="fw-bold text-dark mb-0" style={{ fontSize: "19px" }}>
+                  Marketplace Settlements & Fee Audit Ledger 💸
+                </h4>
+                <span className="badge-soft badge-soft-success">Automated Crediting</span>
+              </div>
+              <p className="text-muted small mb-0">
+                Audited transaction logs showing buyer debits (25%), automated owner payouts (20%), and platform fee collections (5%)
+              </p>
+            </div>
+            <span className="badge bg-light text-dark border">
+              Total Records: {transactions.length}
+            </span>
+          </div>
+
+          {transactions.length === 0 ? (
+            <div className="text-center py-4 text-muted small">No marketplace settlements recorded yet</div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table align-middle table-hover mb-0">
+                <thead className="table-light text-muted small">
+                  <tr>
+                    <th>DATE</th>
+                    <th>TRANSACTION ID</th>
+                    <th>BUYER</th>
+                    <th>COUPON OWNER (UPI/BANK)</th>
+                    <th>DESCRIPTION</th>
+                    <th className="text-end">BUYER PAID (25%)</th>
+                    <th className="text-end">OWNER CREDITED (20%)</th>
+                    <th className="text-end">PLATFORM FEE (5%)</th>
+                    <th className="text-center">STATUS</th>
+                  </tr>
+                </thead>
+                <tbody className="small">
+                  {transactions.map((t) => (
+                    <tr key={t.id}>
+                      <td className="text-muted" style={{ whiteSpace: "nowrap" }}>
+                        {t.created_at ? new Date(t.created_at).toLocaleString() : "Just now"}
+                      </td>
+                      <td>
+                        <span className="badge bg-light text-dark font-monospace border">
+                          {t.transaction_id}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="fw-semibold text-dark">{t.buyer_name}</div>
+                        <div className="text-muted" style={{ fontSize: "11px" }}>{t.buyer_email}</div>
+                      </td>
+                      <td>
+                        <div className="fw-semibold text-dark">{t.owner_name}</div>
+                        <div className="text-muted" style={{ fontSize: "11px" }}>
+                          {t.owner_upi ? `UPI: ${t.owner_upi}` : t.owner_email}
+                        </div>
+                      </td>
+                      <td className="text-secondary" style={{ maxWidth: "220px" }}>{t.description}</td>
+                      <td className="text-end fw-bold text-dark">₹{t.total_amount}</td>
+                      <td className="text-end fw-bold text-success">+₹{t.owner_payout}</td>
+                      <td className="text-end fw-bold text-info">+₹{t.platform_fee}</td>
+                      <td className="text-center">
+                        <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2">
+                          ✓ {t.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

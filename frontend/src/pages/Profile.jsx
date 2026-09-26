@@ -17,6 +17,12 @@ export default function Profile() {
   const [bankName, setBankName] = useState("");
   const [updatingPayment, setUpdatingPayment] = useState(false);
 
+  // Wallet & Transactions
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [totalEarned, setTotalEarned] = useState(0);
+  const [transactions, setTransactions] = useState([]);
+  const [topupLoading, setTopupLoading] = useState(false);
+
   // Security Credentials
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -30,19 +36,43 @@ export default function Profile() {
 
   const loadProfile = async () => {
     try {
-      const response = await api.get("/profile");
-      setName(response.data.name || "");
-      setEmail(response.data.email || "");
-      setCreatedAt(response.data.created_at || "");
-      setUpiId(response.data.upi_id || "");
-      setBankAccountNumber(response.data.bank_account_number || "");
-      setBankIfsc(response.data.bank_ifsc || "");
-      setBankName(response.data.bank_name || "");
+      const [profileRes, walletRes] = await Promise.all([
+        api.get("/profile"),
+        api.get("/wallet").catch(() => ({ data: null }))
+      ]);
+
+      setName(profileRes.data.name || "");
+      setEmail(profileRes.data.email || "");
+      setCreatedAt(profileRes.data.created_at || "");
+      setUpiId(profileRes.data.upi_id || "");
+      setBankAccountNumber(profileRes.data.bank_account_number || "");
+      setBankIfsc(profileRes.data.bank_ifsc || "");
+      setBankName(profileRes.data.bank_name || "");
+
+      if (walletRes.data) {
+        setWalletBalance(walletRes.data.wallet_balance || 0);
+        setTotalEarned(walletRes.data.total_earned || 0);
+        setTransactions(Array.isArray(walletRes.data.transactions) ? walletRes.data.transactions : []);
+      }
     } catch (error) {
       console.error(error);
       toast.error("Failed to load profile");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTopup = async (amount) => {
+    setTopupLoading(true);
+    try {
+      const res = await api.post("/wallet/topup", { amount });
+      toast.success(res.data.message || `Added ₹${amount} successfully!`);
+      loadProfile();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.detail || "Top-up failed");
+    } finally {
+      setTopupLoading(false);
     }
   };
 
@@ -376,6 +406,149 @@ export default function Profile() {
             </form>
           </div>
         </div>
+      </div>
+
+      {/* Wallet, Auto-Payouts & Transaction History Section */}
+      <div className="card mt-4 p-4 shadow-sm border-0" style={{ borderRadius: "16px", border: "1px solid #e2e8f0" }}>
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 pb-3 border-bottom" style={{ borderColor: "#f1f5f9" }}>
+          <div>
+            <div className="d-flex align-items-center gap-2 mb-1">
+              <h4 className="fw-bold text-dark mb-0" style={{ fontSize: "19px" }}>
+                RewardsHub Wallet & Automatic Payouts 💰
+              </h4>
+              <span className="badge-soft badge-soft-primary">Instant Auto-Settlement</span>
+            </div>
+            <p className="text-muted small mb-0">
+              When coupons are requested, <strong>20% owner payouts</strong> are credited automatically to your account and <strong>5% platform fee</strong> is settled seamlessly.
+            </p>
+          </div>
+
+          <div className="d-flex align-items-center gap-2">
+            <span className="text-muted small">Quick Add Funds:</span>
+            <button
+              className="btn btn-outline-primary btn-sm fw-semibold"
+              disabled={topupLoading}
+              onClick={() => handleTopup(250)}
+            >
+              + ₹250
+            </button>
+            <button
+              className="btn btn-outline-primary btn-sm fw-semibold"
+              disabled={topupLoading}
+              onClick={() => handleTopup(500)}
+            >
+              + ₹500
+            </button>
+            <button
+              className="btn btn-outline-primary btn-sm fw-semibold"
+              disabled={topupLoading}
+              onClick={() => handleTopup(1000)}
+            >
+              + ₹1,000
+            </button>
+          </div>
+        </div>
+
+        {/* 3 Metric Cards */}
+        <div className="row g-3 mb-4">
+          <div className="col-12 col-md-4">
+            <div className="p-3 rounded-3" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+              <div className="d-flex align-items-center justify-content-between mb-1">
+                <span className="text-muted small fw-semibold">Available Wallet Balance</span>
+                <span style={{ fontSize: "20px" }}>💳</span>
+              </div>
+              <h3 className="fw-bold text-success mb-0">₹{walletBalance}</h3>
+              <span className="text-muted small" style={{ fontSize: "12px" }}>
+                Used for instant coupon purchases in marketplace
+              </span>
+            </div>
+          </div>
+
+          <div className="col-12 col-md-4">
+            <div className="p-3 rounded-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <div className="d-flex align-items-center justify-content-between mb-1">
+                <span className="text-muted small fw-semibold">Total Payouts Earned</span>
+                <span style={{ fontSize: "20px" }}>📈</span>
+              </div>
+              <h3 className="fw-bold text-primary mb-0">₹{totalEarned}</h3>
+              <span className="text-muted small" style={{ fontSize: "12px" }}>
+                Cumulative 20% coupon earnings automatically credited
+              </span>
+            </div>
+          </div>
+
+          <div className="col-12 col-md-4">
+            <div className="p-3 rounded-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <div className="d-flex align-items-center justify-content-between mb-1">
+                <span className="text-muted small fw-semibold">Primary Payout Destination</span>
+                <span style={{ fontSize: "20px" }}>⚡</span>
+              </div>
+              <h5 className="fw-bold text-dark mb-0 text-truncate">
+                {upiId ? `UPI: ${upiId}` : (bankAccountNumber ? `A/C: ••••${bankAccountNumber.slice(-4)}` : "Not Configured")}
+              </h5>
+              <span className="text-muted small" style={{ fontSize: "12px" }}>
+                {upiId ? "Instant settlement enabled" : "Configure above to direct-deposit"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Transactions Table */}
+        <h5 className="fw-bold text-dark mb-3" style={{ fontSize: "16px" }}>
+          Transaction & Settlement Ledger
+        </h5>
+
+        {transactions.length === 0 ? (
+          <div className="text-center py-4 text-muted small bg-light rounded-3">
+            No transactions recorded yet. Purchase or request coupons in the marketplace to start trading!
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table align-middle table-hover mb-0">
+              <thead className="table-light text-muted small">
+                <tr>
+                  <th>DATE & TIME</th>
+                  <th>TRANSACTION ID</th>
+                  <th>TYPE</th>
+                  <th>DESCRIPTION</th>
+                  <th className="text-end">AMOUNT</th>
+                  <th className="text-center">STATUS</th>
+                </tr>
+              </thead>
+              <tbody className="small">
+                {transactions.map((t) => {
+                  const isCredit = t.type === "CREDIT" || t.type === "TOPUP";
+                  return (
+                    <tr key={t.id}>
+                      <td className="text-muted">
+                        {t.created_at ? new Date(t.created_at).toLocaleString() : "Just now"}
+                      </td>
+                      <td>
+                        <span className="badge bg-light text-dark font-monospace border">
+                          {t.transaction_id}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge-soft ${t.type === "CREDIT" ? "badge-soft-success" : (t.type === "TOPUP" ? "badge-soft-primary" : "badge-soft-danger")}`}>
+                          {t.type}
+                        </span>
+                      </td>
+                      <td className="text-secondary">{t.description}</td>
+                      <td className={`text-end fw-bold ${isCredit ? "text-success" : "text-danger"}`}>
+                        {isCredit ? `+₹${t.amount}` : `-₹${t.amount}`}
+                      </td>
+                      <td className="text-center">
+                        <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2">
+                          ✓ {t.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [userRole, setUserRole] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(null);
 
   useEffect(() => {
     try {
@@ -25,6 +26,9 @@ export default function Navbar() {
       .then((res) => {
         if (res.data?.role) {
           setUserRole(res.data.role);
+        }
+        if (res.data?.wallet_balance !== undefined) {
+          setWalletBalance(res.data.wallet_balance);
         }
       })
       .catch(() => {});
@@ -90,6 +94,25 @@ export default function Navbar() {
               onClick={() => navigate("/admin")}
             >
               👑 Admin Panel
+            </button>
+          )}
+
+          {/* Wallet Balance Badge */}
+          {walletBalance !== null && (
+            <button
+              className="btn btn-sm btn-outline-success d-flex align-items-center gap-1 fw-bold"
+              style={{
+                borderRadius: "10px",
+                padding: "6px 13px",
+                fontSize: "13px",
+                background: "#f0fdf4",
+                borderColor: "#bbf7d0"
+              }}
+              onClick={() => navigate("/profile")}
+              title="RewardsHub Wallet Balance - Click to view or add funds"
+            >
+              <span>💳</span>
+              <span>₹{Number(walletBalance).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
             </button>
           )}
 

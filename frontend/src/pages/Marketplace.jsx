@@ -9,124 +9,63 @@ import { toast } from "react-toastify";
 
 export default function Marketplace() {
 
-  const [coupons, setCoupons] =
-    useState([]);
-
-  const [loading, setLoading] =
-    useState(true);
+  const [coupons, setCoupons] = useState([]);
+  const [wallet, setWallet] = useState(null);
+  const [purchasedReceipt, setPurchasedReceipt] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-
     loadMarketplace();
-
   }, []);
 
   const loadMarketplace = async () => {
-
     try {
+      const [couponsRes, walletRes] = await Promise.all([
+        api.get("/marketplace"),
+        api.get("/wallet").catch(() => ({ data: null }))
+      ]);
 
-      const token =
-        localStorage.getItem("token");
-
-      const response =
-        await api.get(
-          "/marketplace",
-          {
-            headers: {
-              Authorization:
-                `Bearer ${token}`
-            }
-          }
-        );
-
-      setCoupons(
-        Array.isArray(response.data)
-          ? response.data
-          : []
-      );
-
+      setCoupons(Array.isArray(couponsRes.data) ? couponsRes.data : []);
+      if (walletRes.data) {
+        setWallet(walletRes.data);
+      }
     } catch (error) {
-
       console.log(error);
-
-      toast.error(
-        "Failed To Load Marketplace"
-      );
-
+      toast.error("Failed To Load Marketplace");
     } finally {
-
       setLoading(false);
-
     }
-
   };
 
-  const requestCoupon = async (
-    couponId
-  ) => {
-
+  const requestCoupon = async (couponId) => {
     try {
+      const response = await api.post(`/request-coupon/${couponId}`, {});
 
-      const token =
-        localStorage.getItem("token");
-
-      const response =
-        await api.post(
-          `/request-coupon/${couponId}`,
-          {},
-          {
-            headers: {
-              Authorization:
-                `Bearer ${token}`
-            }
-          }
-        );
-
-      toast.success(
-        response.data.message
-      );
-
+      setPurchasedReceipt(response.data);
+      toast.success(response.data.message);
       loadMarketplace();
-
     } catch (error) {
-
       console.log(error);
-
       toast.error(
-        error?.response?.data?.detail
-        ||
-        "Request Failed"
+        error?.response?.data?.detail || "Request Failed"
       );
-
     }
-
   };
 
   if (loading) {
-
     return (
-
       <div className="container mt-4">
-
         <Navbar />
-
-        <h3>
-          Loading Marketplace...
-        </h3>
-
+        <h3>Loading Marketplace...</h3>
       </div>
-
     );
-
   }
 
   return (
-
     <div className="container mt-4 mb-5">
-
       <Navbar />
 
-      {/* Header Banner with Business Rules */}
+      {/* Header Banner with Business Rules & Wallet Status */}
       <div
         className="card mb-4 border-0 text-white overflow-hidden shadow-md"
         style={{
@@ -140,33 +79,65 @@ export default function Marketplace() {
               <span className="badge bg-primary px-3 py-1 rounded-pill">
                 Fair Trade Marketplace
               </span>
-              <span className="text-white-50 small">Instant Claim & Settlement</span>
+              <span className="text-white-50 small">Instant Claim & Automated Settlement</span>
             </div>
             <h2 className="text-white fw-bold mb-1" style={{ fontSize: "26px" }}>
               Coupon Marketplace 🛒
             </h2>
             <p className="text-white-50 mb-0 small">
               Request high-value coupons at <strong>25% of face value</strong>. 
-              Owner receives <strong>20% payout</strong>, and <strong>5% platform fee</strong> covers secure transaction settlement.
+              Owner receives <strong>20% payout</strong> automatically, and <strong>5% platform fee</strong> covers secure settlement.
             </p>
           </div>
 
-          <div className="d-flex gap-2 bg-dark bg-opacity-50 p-2 rounded-3 border border-secondary border-opacity-25">
-            <div className="text-center px-3 py-1 border-end border-secondary border-opacity-25">
-              <span className="text-muted small d-block" style={{ fontSize: "11px" }}>YOU PAY</span>
-              <span className="fw-bold text-warning fs-6">25%</span>
+          <div className="d-flex align-items-center flex-wrap gap-3">
+            {/* Split Badges */}
+            <div className="d-flex gap-2 bg-dark bg-opacity-50 p-2 rounded-3 border border-secondary border-opacity-25">
+              <div className="text-center px-3 py-1 border-end border-secondary border-opacity-25">
+                <span className="text-muted small d-block" style={{ fontSize: "11px" }}>YOU PAY</span>
+                <span className="fw-bold text-warning fs-6">25%</span>
+              </div>
+              <div className="text-center px-3 py-1 border-end border-secondary border-opacity-25">
+                <span className="text-muted small d-block" style={{ fontSize: "11px" }}>OWNER GETS</span>
+                <span className="fw-bold text-success fs-6">20%</span>
+              </div>
+              <div className="text-center px-3 py-1">
+                <span className="text-muted small d-block" style={{ fontSize: "11px" }}>FEE</span>
+                <span className="fw-bold text-info fs-6">5%</span>
+              </div>
             </div>
-            <div className="text-center px-3 py-1 border-end border-secondary border-opacity-25">
-              <span className="text-muted small d-block" style={{ fontSize: "11px" }}>OWNER GETS</span>
-              <span className="fw-bold text-success fs-6">20%</span>
-            </div>
-            <div className="text-center px-3 py-1">
-              <span className="text-muted small d-block" style={{ fontSize: "11px" }}>FEE</span>
-              <span className="fw-bold text-info fs-6">5%</span>
-            </div>
+
+            {/* Wallet balance pill */}
+            {wallet && (
+              <div className="bg-success bg-opacity-10 border border-success border-opacity-25 p-2 px-3 rounded-3 text-end">
+                <span className="text-white-50 small d-block" style={{ fontSize: "11px" }}>WALLET BALANCE</span>
+                <span className="fw-bold text-white fs-6">💳 ₹{wallet.wallet_balance}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Instant Purchase Receipt Banner */}
+      {purchasedReceipt && (
+        <div className="alert alert-success alert-dismissible fade show border-0 shadow-sm p-4 mb-4 rounded-4" style={{ background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
+          <div className="d-flex align-items-center justify-content-between mb-2">
+            <h5 className="fw-bold text-success mb-0">🎉 Coupon Unlocked & Transferred!</h5>
+            <button type="button" className="btn-close" onClick={() => setPurchasedReceipt(null)}></button>
+          </div>
+          <p className="mb-2 text-dark">
+            Coupon Code: <span className="badge bg-success fs-6 px-3 py-1 font-monospace">{purchasedReceipt.coupon_code}</span>
+            <span className="text-muted small ms-2">(Added to your <strong>My Coupons</strong> list)</span>
+          </p>
+          <div className="d-flex flex-wrap gap-3 small text-secondary">
+            <span>Transaction: <strong>{purchasedReceipt.transaction_id}</strong></span>
+            <span>Paid (25%): <strong className="text-dark">₹{purchasedReceipt.total_price}</strong></span>
+            <span>Credited to Owner (20%): <strong className="text-success">₹{purchasedReceipt.owner_payout}</strong></span>
+            <span>Platform Fee (5%): <strong className="text-info">₹{purchasedReceipt.platform_fee}</strong></span>
+            <span>Remaining Balance: <strong className="text-dark">₹{purchasedReceipt.wallet_balance}</strong></span>
+          </div>
+        </div>
+      )}
 
       <div className="row g-3">
 

@@ -3,7 +3,9 @@ from fastapi import Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from app.schemas.profile import (ProfileUpdate, PasswordChange, PaymentDetailsUpdate)
+import uuid
+from datetime import datetime, timezone
+from app.schemas.profile import (ProfileUpdate, PasswordChange, PaymentDetailsUpdate, TopupRequest)
 from app.database.connection import engine
 from app.database.base import Base
 from app.models.audit_log import AuditLog
@@ -22,6 +24,8 @@ from app.models.user import User
 from app.models.coupon import Coupon
 from app.models.share import CouponShare
 from app.models.coupon_request import CouponRequest
+from app.models.transaction import Transaction
+from app.models.platform_account import PlatformAccount
 
 from app.schemas.user import UserCreate
 from app.schemas.user import UserLogin
@@ -31,6 +35,8 @@ from app.schemas.share import ShareCouponRequest
 import app.models.user
 import app.models.coupon
 import app.models.share
+import app.models.transaction
+import app.models.platform_account
 
 # Notifications
 from app.models.notification import Notification
@@ -218,7 +224,9 @@ def get_me(
         "upi_id": current_user.upi_id,
         "bank_account_number": current_user.bank_account_number,
         "bank_ifsc": current_user.bank_ifsc,
-        "bank_name": current_user.bank_name
+        "bank_name": current_user.bank_name,
+        "wallet_balance": round(current_user.wallet_balance or 0.0, 2),
+        "total_earned": round(current_user.total_earned or 0.0, 2)
     }
 
 
@@ -665,6 +673,8 @@ def get_profile(
         "bank_account_number": current_user.bank_account_number,
         "bank_ifsc": current_user.bank_ifsc,
         "bank_name": current_user.bank_name,
+        "wallet_balance": round(current_user.wallet_balance or 0.0, 2),
+        "total_earned": round(current_user.total_earned or 0.0, 2),
         "created_at": current_user.created_at
     }
 
@@ -851,6 +861,11 @@ def admin_stats(
         .count()
     )
 
+    platform_acc = db.query(PlatformAccount).filter(PlatformAccount.id == 1).first()
+    platform_balance = round(platform_acc.balance if platform_acc else 0.0, 2)
+    total_marketplace_volume = round(platform_acc.total_volume if platform_acc else 0.0, 2)
+    total_marketplace_transactions = platform_acc.total_transactions if platform_acc else 0
+
     return {
         "total_users": total_users,
         "admin_users": admin_users,
@@ -858,7 +873,10 @@ def admin_stats(
         "disabled_users": disabled_users,
         "total_coupons": total_coupons,
         "total_shares": total_shares,
-        "accepted_shares": accepted_shares
+        "accepted_shares": accepted_shares,
+        "platform_balance": platform_balance,
+        "total_marketplace_volume": total_marketplace_volume,
+        "total_marketplace_transactions": total_marketplace_transactions
     }
 
 @app.get("/admin/users")
@@ -1254,41 +1272,21 @@ def request_coupon(
     )
 
     if not coupon:
-
         raise HTTPException(
             status_code=404,
             detail="Coupon not found"
         )
 
     if coupon.owner_id == current_user.id:
-
         raise HTTPException(
             status_code=400,
             detail="Cannot request your own coupon"
         )
 
     if coupon.status != "AVAILABLE":
-
         raise HTTPException(
             status_code=400,
-            detail="Coupon not available"
-        )
-
-    existing_request = (
-        db.query(CouponRequest)
-        .filter(
-            CouponRequest.coupon_id == coupon.id,
-            CouponRequest.buyer_id == current_user.id,
-            CouponRequest.status == "PENDING"
-        )
-        .first()
-    )
-
-    if existing_request:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Request already exists"
+            detail="Coupon is no longer available"
         )
 
     val = coupon.coupon_value or 0
@@ -1296,6 +1294,70 @@ def request_coupon(
     owner_payout = round(val * 0.20, 2)
     platform_fee = round(val * 0.05, 2)
 
+    # Check buyer balance
+    if current_user.wallet_balance is None:
+        current_user.wallet_balance = 1000.0
+
+    if current_user.wallet_balance < total_price:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient wallet balance (₹{current_user.wallet_balance:.2f}). You need ₹{total_price:.2f}. Please add funds to your wallet."
+        )
+
+    owner = db.query(User).filter(User.id == coupon.owner_id).first()
+    if not owner:
+        raise HTTPException(
+            status_code=404,
+            detail="Coupon owner not found"
+        )
+
+    # 1. Deduct from buyer
+    current_user.wallet_balance = round(current_user.wallet_balance - total_price, 2)
+
+    # 2. Credit to owner
+    if owner.wallet_balance is None:
+        owner.wallet_balance = 0.0
+    owner.wallet_balance = round(owner.wallet_balance + owner_payout, 2)
+
+    if owner.total_earned is None:
+        owner.total_earned = 0.0
+    owner.total_earned = round(owner.total_earned + owner_payout, 2)
+
+    # 3. Credit to platform account
+    platform_acc = db.query(PlatformAccount).filter(PlatformAccount.id == 1).first()
+    if not platform_acc:
+        platform_acc = PlatformAccount(
+            id=1,
+            balance=0.0,
+            total_volume=0.0,
+            total_transactions=0,
+            account_name="RewardsHub Platform Account"
+        )
+        db.add(platform_acc)
+        db.flush()
+
+    platform_acc.balance = round((platform_acc.balance or 0.0) + platform_fee, 2)
+    platform_acc.total_volume = round((platform_acc.total_volume or 0.0) + total_price, 2)
+    platform_acc.total_transactions = (platform_acc.total_transactions or 0) + 1
+
+    # 4. Generate unique transaction reference
+    txn_ref = f"TXN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
+
+    transaction = Transaction(
+        transaction_id=txn_ref,
+        coupon_id=coupon.id,
+        buyer_id=current_user.id,
+        owner_id=owner.id,
+        total_amount=total_price,
+        owner_payout=owner_payout,
+        platform_fee=platform_fee,
+        owner_upi=owner.upi_id,
+        status="COMPLETED",
+        description=f"Marketplace purchase of '{coupon.title}' (Value: ₹{val})"
+    )
+    db.add(transaction)
+
+    # 5. Record request as COMPLETED
     request = CouponRequest(
         coupon_id=coupon.id,
         buyer_id=current_user.id,
@@ -1303,31 +1365,196 @@ def request_coupon(
         total_price=total_price,
         owner_payout=owner_payout,
         platform_fee=platform_fee,
-        status="PENDING"
+        status="COMPLETED"
     )
-
     db.add(request)
+
+    # 6. Transfer coupon to buyer
+    coupon.owner_id = current_user.id
+    coupon.status = "ACQUIRED"
+
+    # 7. Notifications
+    owner_dest = f"UPI ({owner.upi_id})" if owner.upi_id else "Registered Bank/Wallet"
+    create_notification(
+        db,
+        owner.id,
+        "💰 Payout Credited Automatically!",
+        f"₹{owner_payout:.2f} (20% payout) has been automatically credited to your {owner_dest} for '{coupon.title}'! Buyer: {current_user.name}."
+    )
 
     create_notification(
         db,
-        coupon.owner_id,
-        "New Coupon Request",
-        f"{current_user.name} requested '{coupon.title}'. Payout on settlement: ₹{owner_payout} (Platform fee: ₹{platform_fee})."
+        current_user.id,
+        "🎉 Coupon Acquired & Paid",
+        f"Paid ₹{total_price:.2f}. Coupon '{coupon.title}' is now in My Coupons! Code: {coupon.coupon_code}. (Owner credited: ₹{owner_payout}, Platform fee: ₹{platform_fee})."
     )
 
+    # 8. Audit log
     create_audit_log(
         db,
         current_user.id,
-        "REQUEST_COUPON",
-        f"{coupon.title} - Total: ₹{total_price} (Owner: ₹{owner_payout}, Fee: ₹{platform_fee})"
+        "MARKETPLACE_PURCHASE",
+        f"{txn_ref}: Purchased '{coupon.title}' for ₹{total_price} (Owner: ₹{owner_payout}, Platform: ₹{platform_fee})"
     )
 
     db.commit()
 
     return {
-        "message": f"Coupon request submitted. Total to pay: ₹{total_price} (Owner receives ₹{owner_payout}, Platform fee: ₹{platform_fee})",
+        "message": f"Successfully purchased! ₹{total_price} debited. ₹{owner_payout} automatically credited to owner ({owner.name}) and ₹{platform_fee} credited to platform.",
+        "transaction_id": txn_ref,
+        "coupon_id": coupon.id,
+        "coupon_code": coupon.coupon_code,
         "total_price": total_price,
         "owner_payout": owner_payout,
-        "platform_fee": platform_fee
+        "platform_fee": platform_fee,
+        "wallet_balance": current_user.wallet_balance
     }
+
+
+# -------------------------
+# WALLET & TRANSACTIONS
+# -------------------------
+
+@app.get("/wallet")
+def get_wallet(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.wallet_balance is None:
+        current_user.wallet_balance = 1000.0
+        db.commit()
+
+    txns = (
+        db.query(Transaction)
+        .filter(
+            (Transaction.buyer_id == current_user.id) |
+            (Transaction.owner_id == current_user.id)
+        )
+        .order_by(Transaction.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
+    txn_list = []
+    for t in txns:
+        is_buyer = (t.buyer_id == current_user.id)
+        is_topup = (t.buyer_id == t.owner_id and "top-up" in (t.description or "").lower())
+
+        if is_topup:
+            txn_type = "TOPUP"
+            display_amount = t.total_amount
+        elif is_buyer:
+            txn_type = "DEBIT"
+            display_amount = t.total_amount
+        else:
+            txn_type = "CREDIT"
+            display_amount = t.owner_payout
+
+        txn_list.append({
+            "id": t.id,
+            "transaction_id": t.transaction_id,
+            "type": txn_type,
+            "amount": display_amount,
+            "total_amount": t.total_amount,
+            "owner_payout": t.owner_payout,
+            "platform_fee": t.platform_fee,
+            "description": t.description,
+            "status": t.status,
+            "created_at": t.created_at
+        })
+
+    return {
+        "wallet_balance": round(current_user.wallet_balance or 0.0, 2),
+        "total_earned": round(current_user.total_earned or 0.0, 2),
+        "upi_id": current_user.upi_id,
+        "bank_account_number": current_user.bank_account_number,
+        "bank_ifsc": current_user.bank_ifsc,
+        "bank_name": current_user.bank_name,
+        "transactions": txn_list
+    }
+
+
+@app.post("/wallet/topup")
+def topup_wallet(
+    req: TopupRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if req.amount <= 0:
+        raise HTTPException(status_code=400, detail="Top-up amount must be greater than 0")
+
+    if current_user.wallet_balance is None:
+        current_user.wallet_balance = 0.0
+
+    current_user.wallet_balance = round(current_user.wallet_balance + req.amount, 2)
+
+    txn_ref = f"TOPUP-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
+
+    transaction = Transaction(
+        transaction_id=txn_ref,
+        buyer_id=current_user.id,
+        owner_id=current_user.id,
+        total_amount=req.amount,
+        owner_payout=req.amount,
+        platform_fee=0.0,
+        status="COMPLETED",
+        description=f"Wallet top-up of ₹{req.amount:.2f} via UPI/Card"
+    )
+    db.add(transaction)
+
+    create_notification(
+        db,
+        current_user.id,
+        "💳 Wallet Top-up Successful",
+        f"₹{req.amount:.2f} has been added to your RewardsHub wallet. New balance: ₹{current_user.wallet_balance:.2f}."
+    )
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "WALLET_TOPUP",
+        f"{txn_ref}: Added ₹{req.amount:.2f}. Balance: ₹{current_user.wallet_balance:.2f}"
+    )
+
+    db.commit()
+
+    return {
+        "message": f"Successfully added ₹{req.amount:.2f} to wallet",
+        "wallet_balance": current_user.wallet_balance,
+        "transaction_id": txn_ref
+    }
+
+
+# -------------------------
+# ADMIN TRANSACTIONS
+# -------------------------
+
+@app.get("/admin/transactions")
+def admin_transactions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    verify_admin(current_user)
+
+    txns = db.query(Transaction).order_by(Transaction.created_at.desc()).limit(100).all()
+    res = []
+    for t in txns:
+        buyer = db.query(User).filter(User.id == t.buyer_id).first()
+        owner = db.query(User).filter(User.id == t.owner_id).first()
+        res.append({
+            "id": t.id,
+            "transaction_id": t.transaction_id,
+            "buyer_name": buyer.name if buyer else "Unknown",
+            "buyer_email": buyer.email if buyer else "Unknown",
+            "owner_name": owner.name if owner else "Unknown",
+            "owner_email": owner.email if owner else "Unknown",
+            "owner_upi": t.owner_upi or (owner.upi_id if owner else None),
+            "total_amount": t.total_amount,
+            "owner_payout": t.owner_payout,
+            "platform_fee": t.platform_fee,
+            "status": t.status,
+            "description": t.description,
+            "created_at": t.created_at
+        })
+    return res
     
