@@ -52,6 +52,26 @@ class Coupon(Base):
         String,
         default="AVAILABLE"
     )
+    is_ocr_verified = Column(
+        Boolean,
+        default=False
+    )
+    ocr_proof_url = Column(
+        String,
+        nullable=True
+    )
+    escrow_status = Column(
+        String,
+        default="NONE"
+    )
+    buyer_id = Column(
+        Integer,
+        nullable=True
+    )
+    seller_id = Column(
+        Integer,
+        nullable=True
+    )
     created_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc)

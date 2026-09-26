@@ -1,14 +1,17 @@
 from fastapi import FastAPI
 from fastapi import Depends
+from fastapi import UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import uuid
 from datetime import datetime, timezone
 from app.schemas.profile import (ProfileUpdate, PasswordChange, PaymentDetailsUpdate, TopupRequest)
+from app.schemas.coupon import CouponCreate, DisputeRequest
 from app.database.connection import engine
 from app.database.base import Base
 from app.models.audit_log import AuditLog
+from app.services.ocr import verify_coupon_screenshot
 
 from fastapi import HTTPException
 
@@ -29,7 +32,6 @@ from app.models.platform_account import PlatformAccount
 
 from app.schemas.user import UserCreate
 from app.schemas.user import UserLogin
-from app.schemas.coupon import CouponCreate
 from app.schemas.share import ShareCouponRequest
 
 import app.models.user
@@ -231,6 +233,29 @@ def get_me(
 
 
 # -------------------------
+# OCR VERIFY COUPON SCREENSHOT
+# -------------------------
+
+@app.post("/coupons/verify-ocr")
+async def verify_ocr(
+    file: UploadFile = File(...),
+    brand: str = Form(None),
+    coupon_code: str = Form(None),
+    current_user: User = Depends(get_current_user)
+):
+    contents = await file.read()
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image file too large (max 10MB)")
+
+    result = verify_coupon_screenshot(
+        image_bytes=contents,
+        claimed_brand=brand,
+        claimed_code=coupon_code
+    )
+    return result
+
+
+# -------------------------
 # CREATE COUPON
 # -------------------------
 
@@ -247,24 +272,28 @@ def create_coupon(
         coupon_code=coupon.coupon_code,
         coupon_value=coupon.coupon_value,
         status="AVAILABLE",
+        is_ocr_verified=bool(coupon.is_ocr_verified),
+        escrow_status="NONE",
         expiry_date=coupon.expiry_date,
         owner_id=current_user.id
-)
+    )
 
     db.add(new_coupon)
     db.commit()
     db.refresh(new_coupon)
 
+    action_name = "CREATE_OCR_VERIFIED_COUPON" if coupon.is_ocr_verified else "CREATE_COUPON"
     create_audit_log(
         db,
         current_user.id,
-        "CREATE_COUPON",
-        coupon.title
+        action_name,
+        f"{coupon.title} (Value: ₹{coupon.coupon_value}, OCR Verified: {coupon.is_ocr_verified})"
     )
 
     return {
-        "message": "Coupon created",
-        "coupon_id": new_coupon.id
+        "message": "Coupon created successfully" + (" with verified OCR proof!" if coupon.is_ocr_verified else ""),
+        "coupon_id": new_coupon.id,
+        "is_ocr_verified": new_coupon.is_ocr_verified
     }
 
 
@@ -1252,6 +1281,7 @@ def marketplace(
             "owner_payout": owner_payout,
             "platform_fee": platform_fee,
             "owner_id": coupon.owner_id,
+            "is_ocr_verified": bool(coupon.is_ocr_verified),
             "status": coupon.status
         })
 
@@ -1312,19 +1342,10 @@ def request_coupon(
             detail="Coupon owner not found"
         )
 
-    # 1. Deduct from buyer
+    # 1. Deduct 25% from buyer's account
     current_user.wallet_balance = round(current_user.wallet_balance - total_price, 2)
 
-    # 2. Credit to owner
-    if owner.wallet_balance is None:
-        owner.wallet_balance = 0.0
-    owner.wallet_balance = round(owner.wallet_balance + owner_payout, 2)
-
-    if owner.total_earned is None:
-        owner.total_earned = 0.0
-    owner.total_earned = round(owner.total_earned + owner_payout, 2)
-
-    # 3. Credit to platform account
+    # 2. Credit platform fee 5% to platform treasury
     platform_acc = db.query(PlatformAccount).filter(PlatformAccount.id == 1).first()
     if not platform_acc:
         platform_acc = PlatformAccount(
@@ -1341,7 +1362,7 @@ def request_coupon(
     platform_acc.total_volume = round((platform_acc.total_volume or 0.0) + total_price, 2)
     platform_acc.total_transactions = (platform_acc.total_transactions or 0) + 1
 
-    # 4. Generate unique transaction reference
+    # 3. Generate unique transaction reference with ESCROW_HOLD status
     txn_ref = f"TXN-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
 
     transaction = Transaction(
@@ -1353,12 +1374,12 @@ def request_coupon(
         owner_payout=owner_payout,
         platform_fee=platform_fee,
         owner_upi=owner.upi_id,
-        status="COMPLETED",
-        description=f"Marketplace purchase of '{coupon.title}' (Value: ₹{val})"
+        status="ESCROW_HOLD",
+        description=f"Marketplace purchase of '{coupon.title}' (Value: ₹{val}) [HELD IN ESCROW - BUYER PROTECTED]"
     )
     db.add(transaction)
 
-    # 5. Record request as COMPLETED
+    # 4. Record request with ESCROW_HOLD status
     request = CouponRequest(
         coupon_id=coupon.id,
         buyer_id=current_user.id,
@@ -1366,49 +1387,233 @@ def request_coupon(
         total_price=total_price,
         owner_payout=owner_payout,
         platform_fee=platform_fee,
-        status="COMPLETED"
+        status="ESCROW_HOLD"
     )
     db.add(request)
 
-    # 6. Transfer coupon to buyer
+    # 5. Transfer coupon to buyer with IN_ESCROW status
+    coupon.seller_id = coupon.owner_id
+    coupon.buyer_id = current_user.id
     coupon.owner_id = current_user.id
-    coupon.status = "ACQUIRED"
+    coupon.escrow_status = "IN_ESCROW"
+    coupon.status = "ACQUIRED_IN_ESCROW"
 
-    # 7. Notifications
+    # 6. Notifications
     owner_dest = f"UPI ({owner.upi_id})" if owner.upi_id else "Registered Bank/Wallet"
     create_notification(
         db,
         owner.id,
-        "💰 Payout Credited Automatically!",
-        f"₹{owner_payout:.2f} (20% payout) has been automatically credited to your {owner_dest} for '{coupon.title}'! Buyer: {current_user.name}."
+        "🔒 Payout Secured in Escrow",
+        f"Buyer {current_user.name} paid ₹{total_price:.2f} for '{coupon.title}'. Your ₹{owner_payout:.2f} payout is held safely in RewardsHub Escrow and will be released upon buyer confirmation."
     )
 
     create_notification(
         db,
         current_user.id,
-        "🎉 Coupon Acquired & Paid",
-        f"Paid ₹{total_price:.2f}. Coupon '{coupon.title}' is now in My Coupons! Code: {coupon.coupon_code}. (Owner credited: ₹{owner_payout}, Platform fee: ₹{platform_fee})."
+        "🛡️ Buyer Protection Active (In Escrow)",
+        f"Paid ₹{total_price:.2f}. Coupon '{coupon.title}' is now in My Coupons! Code: {coupon.coupon_code}. Funds are held in Escrow: test the code and click 'Verify & Redeem' or 'Report Issue' for a 100% refund."
     )
 
-    # 8. Audit log
+    # 7. Audit log
     create_audit_log(
         db,
         current_user.id,
-        "MARKETPLACE_PURCHASE",
-        f"{txn_ref}: Purchased '{coupon.title}' for ₹{total_price} (Owner: ₹{owner_payout}, Platform: ₹{platform_fee})"
+        "MARKETPLACE_ESCROW_PURCHASE",
+        f"{txn_ref}: Purchased '{coupon.title}' for ₹{total_price} [Escrow Hold: ₹{owner_payout} to {owner.email}]"
     )
 
     db.commit()
 
     return {
-        "message": f"Successfully purchased! ₹{total_price} debited. ₹{owner_payout} automatically credited to owner ({owner.name}) and ₹{platform_fee} credited to platform.",
+        "message": f"Successfully purchased! ₹{total_price} debited and held safely in Escrow. Test code: {coupon.coupon_code}. Click 'Verify & Redeem' once tested.",
         "transaction_id": txn_ref,
         "coupon_id": coupon.id,
         "coupon_code": coupon.coupon_code,
         "total_price": total_price,
         "owner_payout": owner_payout,
         "platform_fee": platform_fee,
-        "wallet_balance": current_user.wallet_balance
+        "wallet_balance": current_user.wallet_balance,
+        "escrow_status": "IN_ESCROW"
+    }
+
+
+# -------------------------
+# BUYER: VERIFY & REDEEM (RELEASE ESCROW)
+# -------------------------
+
+@app.post("/coupons/{coupon_id}/confirm-redeem")
+def confirm_redeem(
+    coupon_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    coupon = db.query(Coupon).filter(Coupon.id == coupon_id).first()
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+
+    if coupon.buyer_id != current_user.id and coupon.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the coupon buyer can confirm redemption")
+
+    if coupon.escrow_status != "IN_ESCROW":
+        raise HTTPException(status_code=400, detail="This coupon is not currently held in escrow")
+
+    # Find the active escrow transaction
+    txn = (
+        db.query(Transaction)
+        .filter(
+            Transaction.coupon_id == coupon.id,
+            Transaction.buyer_id == current_user.id,
+            Transaction.status == "ESCROW_HOLD"
+        )
+        .order_by(Transaction.id.desc())
+        .first()
+    )
+
+    if not txn:
+        raise HTTPException(status_code=400, detail="No active escrow transaction found for this coupon")
+
+    seller = db.query(User).filter(User.id == txn.owner_id).first()
+    if not seller:
+        raise HTTPException(status_code=404, detail="Coupon seller not found")
+
+    # Release 20% payout from escrow to seller's account
+    seller.wallet_balance = round((seller.wallet_balance or 0.0) + txn.owner_payout, 2)
+    seller.total_earned = round((seller.total_earned or 0.0) + txn.owner_payout, 2)
+
+    # Update statuses
+    txn.status = "COMPLETED"
+    txn.description = txn.description.replace("[HELD IN ESCROW - BUYER PROTECTED]", "[Verified & Released from Escrow by Buyer]")
+    coupon.escrow_status = "RELEASED"
+    coupon.status = "REDEEMED"
+
+    seller_dest = f"UPI ({seller.upi_id})" if seller.upi_id else "Registered Bank/Wallet"
+    create_notification(
+        db,
+        seller.id,
+        "🎉 Escrow Payout Released!",
+        f"Buyer {current_user.name} verified that '{coupon.title}' works! ₹{txn.owner_payout:.2f} has been credited to your {seller_dest}."
+    )
+
+    create_notification(
+        db,
+        current_user.id,
+        "✅ Verification Confirmed",
+        f"You verified '{coupon.title}'. The seller payout (₹{txn.owner_payout:.2f}) has been released. Thank you for trading safely!"
+    )
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "CONFIRM_REDEEM_RELEASE_ESCROW",
+        f"{txn.transaction_id}: Released ₹{txn.owner_payout} to {seller.email} for '{coupon.title}'"
+    )
+
+    db.commit()
+
+    return {
+        "message": f"Coupon verified! ₹{txn.owner_payout:.2f} payout released to seller.",
+        "coupon_id": coupon.id,
+        "escrow_status": "RELEASED",
+        "status": "REDEEMED"
+    }
+
+
+# -------------------------
+# BUYER: REPORT DISPUTE & 100% REFUND
+# -------------------------
+
+@app.post("/coupons/{coupon_id}/dispute-refund")
+def dispute_refund(
+    coupon_id: int,
+    req: DisputeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    coupon = db.query(Coupon).filter(Coupon.id == coupon_id).first()
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+
+    if coupon.buyer_id != current_user.id and coupon.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the coupon buyer can dispute this purchase")
+
+    if coupon.escrow_status != "IN_ESCROW":
+        raise HTTPException(status_code=400, detail="Cannot dispute: Coupon is not held in escrow")
+
+    txn = (
+        db.query(Transaction)
+        .filter(
+            Transaction.coupon_id == coupon.id,
+            Transaction.buyer_id == current_user.id,
+            Transaction.status == "ESCROW_HOLD"
+        )
+        .order_by(Transaction.id.desc())
+        .first()
+    )
+
+    if not txn:
+        raise HTTPException(status_code=400, detail="No active escrow transaction found")
+
+    seller = db.query(User).filter(User.id == txn.owner_id).first()
+
+    # 100% Instant Refund back to buyer's wallet!
+    current_user.wallet_balance = round((current_user.wallet_balance or 0.0) + txn.total_amount, 2)
+
+    # Reverse platform fee
+    platform_acc = db.query(PlatformAccount).filter(PlatformAccount.id == 1).first()
+    if platform_acc and platform_acc.balance and platform_acc.balance >= txn.platform_fee:
+        platform_acc.balance = round(platform_acc.balance - txn.platform_fee, 2)
+
+    # Mark transaction as REFUNDED
+    txn.status = "REFUNDED"
+    txn.description = txn.description.replace("[HELD IN ESCROW - BUYER PROTECTED]", f"[DISPUTED & REFUNDED: {req.reason}]")
+
+    # Mark coupon as invalid
+    coupon.escrow_status = "REFUNDED"
+    coupon.status = "DISPUTED_INVALID"
+
+    refund_txn = Transaction(
+        transaction_id=f"REFUND-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}",
+        coupon_id=coupon.id,
+        buyer_id=current_user.id,
+        owner_id=current_user.id,
+        total_amount=txn.total_amount,
+        owner_payout=txn.total_amount,
+        platform_fee=0.0,
+        status="COMPLETED",
+        description=f"100% Buyer Protection Refund for '{coupon.title}' (Reason: {req.reason})"
+    )
+    db.add(refund_txn)
+
+    create_notification(
+        db,
+        current_user.id,
+        "💰 100% Refund Credited!",
+        f"₹{txn.total_amount:.2f} has been refunded to your RewardsHub wallet for invalid coupon '{coupon.title}'. Reason: {req.reason}."
+    )
+
+    if seller:
+        create_notification(
+            db,
+            seller.id,
+            "⚠️ Dispute Raised - Escrow Cancelled",
+            f"Buyer reported '{coupon.title}' as invalid ({req.reason}). Payout was cancelled and buyer was refunded 100%."
+        )
+
+    create_audit_log(
+        db,
+        current_user.id,
+        "BUYER_DISPUTE_REFUND",
+        f"Refunded ₹{txn.total_amount} for '{coupon.title}'. Reason: {req.reason}"
+    )
+
+    db.commit()
+
+    return {
+        "message": f"Dispute approved under Buyer Protection Guarantee! ₹{txn.total_amount:.2f} refunded to your wallet.",
+        "refund_amount": txn.total_amount,
+        "wallet_balance": current_user.wallet_balance,
+        "escrow_status": "REFUNDED",
+        "status": "DISPUTED_INVALID"
     }
 
 

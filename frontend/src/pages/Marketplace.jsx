@@ -79,14 +79,14 @@ export default function Marketplace() {
               <span className="badge bg-primary px-3 py-1 rounded-pill">
                 Fair Trade Marketplace
               </span>
-              <span className="text-white-50 small">Instant Claim & Automated Settlement</span>
+              <span className="text-white-50 small">🛡️ 100% Escrow Protected & OCR Verified</span>
             </div>
             <h2 className="text-white fw-bold mb-1" style={{ fontSize: "26px" }}>
               Coupon Marketplace 🛒
             </h2>
             <p className="text-white-50 mb-0 small">
               Request high-value coupons at <strong>25% of face value</strong>. 
-              Owner receives <strong>20% payout</strong> automatically, and <strong>5% platform fee</strong> covers secure settlement.
+              Your payment is held safely in <strong>Escrow</strong> until you verify the coupon works. Owner receives <strong>20% payout</strong> upon verification, and you are protected by an instant <strong>100% refund</strong> if invalid.
             </p>
           </div>
 
@@ -173,9 +173,16 @@ export default function Marketplace() {
                           description={coupon.description}
                           size={46}
                         />
-                        <span className="badge-soft badge-soft-primary">
-                          {coupon.source_app}
-                        </span>
+                        <div className="d-flex flex-column align-items-end gap-1">
+                          <span className="badge-soft badge-soft-primary">
+                            {coupon.source_app}
+                          </span>
+                          {coupon.is_ocr_verified && (
+                            <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill small" style={{ fontSize: "10px" }}>
+                              🛡️ OCR Verified
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <h5 className="fw-bold text-dark mb-1" style={{ fontSize: "17px", lineHeight: "1.3" }}>
@@ -206,18 +213,23 @@ export default function Marketplace() {
                           <strong className="text-success">₹{ownerPayout}</strong>
                         </div>
                         <div className="d-flex justify-content-between text-secondary">
-                          <span>Convenience & Platform Fee (5%):</span>
+                          <span>Platform Fee (5%):</span>
                           <strong className="text-muted">₹{platformFee}</strong>
                         </div>
                       </div>
                     </div>
 
-                    <button
-                      className="btn btn-primary w-100 py-2 mt-2"
-                      onClick={() => requestCoupon(coupon.id)}
-                    >
-                      Request & Pay ₹{totalPrice}
-                    </button>
+                    <div>
+                      <div className="d-flex align-items-center justify-content-center gap-1 mb-2 text-primary small" style={{ fontSize: "11px" }}>
+                        <span>🔒 100% Escrow Protected • Instant Refund Guarantee</span>
+                      </div>
+                      <button
+                        className="btn btn-primary w-100 py-2"
+                        onClick={() => requestCoupon(coupon.id)}
+                      >
+                        Request & Pay ₹{totalPrice}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
