@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import api from "../services/api";
 
@@ -7,21 +7,47 @@ import CouponLogo from "../components/CouponLogo";
 
 import { toast } from "react-toastify";
 
+const CATEGORIES = [
+  { id: "ALL", label: "All Categories", icon: "🌐" },
+  { id: "FOOD", label: "Food & Dining", icon: "🍔" },
+  { id: "FASHION", label: "Fashion & Shopping", icon: "🛍️" },
+  { id: "TRAVEL", label: "Travel & Commute", icon: "✈️" },
+  { id: "ENTERTAINMENT", label: "OTT & Entertainment", icon: "🎬" },
+  { id: "HEALTH", label: "Health & Wellness", icon: "💊" },
+  { id: "EDTECH", label: "EdTech & Courses", icon: "🎓" },
+  { id: "GAMING", label: "Gaming & Digital", icon: "🎮" },
+  { id: "OTHER", label: "Other Offers", icon: "🏷️" }
+];
+
+const MARKET_DISCOUNT_TYPES = [
+  { id: "ALL", label: "All Mechanisms", icon: "✨" },
+  { id: "FLAT_AMOUNT", label: "Fixed Amount-Off", icon: "💵" },
+  { id: "PERCENTAGE", label: "Percentage-Off", icon: "🏷️" },
+  { id: "BOGO", label: "BOGO", icon: "🎁" },
+  { id: "FREE_SHIPPING", label: "Free Shipping", icon: "🚚" },
+  { id: "FREE_GIFT", label: "Free Gift / Trial", icon: "✨" },
+  { id: "TIERED", label: "Tiered Threshold", icon: "📊" }
+];
+
 export default function Marketplace() {
 
   const [coupons, setCoupons] = useState([]);
   const [wallet, setWallet] = useState(null);
   const [purchasedReceipt, setPurchasedReceipt] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [selectedDiscountType, setSelectedDiscountType] = useState("ALL");
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    loadMarketplace();
-  }, []);
-
-  const loadMarketplace = async () => {
+  const loadMarketplace = useCallback(async (cat = selectedCategory, disc = selectedDiscountType) => {
     try {
+      const params = new URLSearchParams();
+      if (cat && cat !== "ALL") params.append("category", cat);
+      if (disc && disc !== "ALL") params.append("discount_type", disc);
+      const url = params.toString() ? `/marketplace?${params.toString()}` : "/marketplace";
+
       const [couponsRes, walletRes] = await Promise.all([
-        api.get("/marketplace"),
+        api.get(url),
         api.get("/wallet").catch(() => ({ data: null }))
       ]);
 
@@ -35,7 +61,11 @@ export default function Marketplace() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCategory, selectedDiscountType]);
+
+  useEffect(() => {
+    loadMarketplace();
+  }, [loadMarketplace]);
 
   const requestCoupon = async (couponId) => {
     try {
@@ -139,22 +169,104 @@ export default function Marketplace() {
         </div>
       )}
 
+      {/* Category Pills & Search Toolbar */}
+      <div className="card p-3 mb-4 border-0 shadow-sm" style={{ borderRadius: "16px", background: "#ffffff", border: "1px solid #e2e8f0" }}>
+        <div className="row g-2 align-items-center mb-3">
+          <div className="col-12 col-md-6">
+            <div className="input-group">
+              <span className="input-group-text bg-white border-end-0 text-muted">🔍</span>
+              <input
+                className="form-control border-start-0"
+                placeholder="Search marketplace by brand, title, or terms..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search && (
+                <button className="btn btn-outline-secondary border-start-0" onClick={() => setSearch("")}>✕</button>
+              )}
+            </div>
+          </div>
+          <div className="col-12 col-md-6 text-md-end text-muted small">
+            Showing <strong>{coupons.filter(c => {
+              const q = search.toLowerCase();
+              return !q || (c.title || "").toLowerCase().includes(q) || (c.source_app || "").toLowerCase().includes(q) || (c.terms_note || "").toLowerCase().includes(q);
+            }).length}</strong> offer(s)
+          </div>
+        </div>
+
+        {/* Scrollable Category Chips */}
+        <div className="d-flex align-items-center gap-2 overflow-auto pb-2 border-bottom" style={{ whiteSpace: "nowrap" }}>
+          <span className="text-muted small fw-semibold me-1">Category:</span>
+          {CATEGORIES.map((cat) => {
+            const isActive = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`btn btn-sm rounded-pill px-3 py-1 transition-all ${
+                  isActive
+                    ? "btn-primary shadow-sm fw-bold"
+                    : "btn-outline-secondary border-0 bg-light text-dark"
+                }`}
+                style={{ fontSize: "12px" }}
+              >
+                <span className="me-1">{cat.icon}</span>
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Scrollable Discount Mechanism Chips */}
+        <div className="d-flex align-items-center gap-2 overflow-auto pt-2" style={{ whiteSpace: "nowrap" }}>
+          <span className="text-muted small fw-semibold me-1">Mechanism:</span>
+          {MARKET_DISCOUNT_TYPES.map((dt) => {
+            const isActive = selectedDiscountType === dt.id;
+            return (
+              <button
+                key={dt.id}
+                onClick={() => setSelectedDiscountType(dt.id)}
+                className={`btn btn-sm rounded-pill px-3 py-1 transition-all ${
+                  isActive
+                    ? "btn-dark shadow-sm fw-bold"
+                    : "btn-outline-secondary border-0 bg-light text-secondary"
+                }`}
+                style={{ fontSize: "12px" }}
+              >
+                <span className="me-1">{dt.icon}</span>
+                {dt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="row g-3">
 
         {
-          coupons.length === 0 && (
+          coupons
+            .filter(c => {
+              const q = search.toLowerCase();
+              return !q || (c.title || "").toLowerCase().includes(q) || (c.source_app || "").toLowerCase().includes(q) || (c.terms_note || "").toLowerCase().includes(q);
+            })
+            .length === 0 && (
             <div className="col-12">
               <div className="card text-center p-5 border-dashed">
                 <div style={{ fontSize: "40px" }} className="mb-2">🛒</div>
-                <h5 className="fw-semibold text-dark">No marketplace coupons available</h5>
-                <p className="text-muted small">Check back soon or share your own unused coupons to earn rewards.</p>
+                <h5 className="fw-semibold text-dark">No marketplace coupons found</h5>
+                <p className="text-muted small">Try selecting another category or check back soon.</p>
               </div>
             </div>
           )
         }
 
         {
-          coupons.map((coupon) => {
+          coupons
+            .filter(c => {
+              const q = search.toLowerCase();
+              return !q || (c.title || "").toLowerCase().includes(q) || (c.source_app || "").toLowerCase().includes(q) || (c.terms_note || "").toLowerCase().includes(q);
+            })
+            .map((coupon) => {
             const val = coupon.coupon_value || 0;
             const totalPrice = coupon.total_price ?? Math.round(val * 0.25);
             const ownerPayout = coupon.owner_payout ?? Math.round(val * 0.20);
@@ -177,21 +289,92 @@ export default function Marketplace() {
                           <span className="badge-soft badge-soft-primary">
                             {coupon.source_app}
                           </span>
+                          {coupon.category && coupon.category !== "OTHER" && (
+                            <span className="badge bg-light text-dark border px-2 py-1 rounded-pill small" style={{ fontSize: "10px" }}>
+                              {CATEGORIES.find(c => c.id === coupon.category)?.icon || "🏷️"} {CATEGORIES.find(c => c.id === coupon.category)?.label || coupon.category}
+                            </span>
+                          )}
+                          {coupon.is_owner && (
+                            <span className="badge bg-warning bg-opacity-25 text-dark border border-warning px-2 py-1 rounded-pill small fw-bold" style={{ fontSize: "10px" }}>
+                              🏷️ Listed by You
+                            </span>
+                          )}
                           {coupon.is_ocr_verified && (
                             <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill small" style={{ fontSize: "10px" }}>
                               🛡️ OCR Verified
                             </span>
                           )}
+                          {coupon.has_security_pin && (
+                            <span className="badge bg-secondary bg-opacity-10 text-dark border border-secondary border-opacity-25 px-2 py-1 rounded-pill small" style={{ fontSize: "10px" }}>
+                              🔐 Gift Card + PIN Included
+                            </span>
+                          )}
+                          {coupon.has_redemption_url && (
+                            <span className="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1 rounded-pill small" style={{ fontSize: "10px" }}>
+                              🔗 Direct Link Included
+                            </span>
+                          )}
                         </div>
+                      </div>
+
+                      {/* Mechanism and Targeting Highlights */}
+                      <div className="d-flex flex-wrap gap-1 mb-2">
+                        {coupon.discount_type === "PERCENTAGE" && (
+                          <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1 rounded-pill small fw-bold">
+                            🏷️ {coupon.discount_percent}% OFF {coupon.max_discount_cap ? `(Max ₹${coupon.max_discount_cap})` : ""}
+                          </span>
+                        )}
+                        {coupon.discount_type === "BOGO" && (
+                          <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1 rounded-pill small fw-bold">
+                            🎁 BOGO {coupon.bogo_details ? `(${coupon.bogo_details})` : ""}
+                          </span>
+                        )}
+                        {coupon.discount_type === "FREE_SHIPPING" && (
+                          <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill small fw-bold">
+                            🚚 Free Shipping {coupon.min_order_value ? `(Min ₹${coupon.min_order_value})` : ""}
+                          </span>
+                        )}
+                        {coupon.discount_type === "FREE_GIFT" && (
+                          <span className="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1 rounded-pill small fw-bold">
+                            ✨ Free Gift / Trial {coupon.free_gift_details ? `(${coupon.free_gift_details})` : ""}
+                          </span>
+                        )}
+                        {coupon.min_order_value > 0 && coupon.discount_type !== "FREE_SHIPPING" && (
+                          <span className="badge bg-light text-secondary border px-2 py-1 rounded-pill small">
+                            🛒 Min Spend: ₹{coupon.min_order_value}
+                          </span>
+                        )}
+                        {coupon.target_audience === "NEW_USERS" && (
+                          <span className="badge bg-warning bg-opacity-25 text-dark border border-warning px-2 py-1 rounded-pill small">
+                            👤 New Users Only
+                          </span>
+                        )}
+                        {coupon.usage_structure === "STACKABLE" && (
+                          <span className="badge bg-info bg-opacity-10 text-primary border border-info border-opacity-25 px-2 py-1 rounded-pill small">
+                            ⚡ Stackable
+                          </span>
+                        )}
+                        {coupon.distribution_channel === "IN_STORE" && (
+                          <span className="badge bg-dark text-white px-2 py-1 rounded-pill small">
+                            📱 In-Store Counter Barcode
+                          </span>
+                        )}
                       </div>
 
                       <h5 className="fw-bold text-dark mb-1" style={{ fontSize: "17px", lineHeight: "1.3" }}>
                         {coupon.title}
                       </h5>
                       {coupon.description && (
-                        <p className="text-muted small mb-3" style={{ fontSize: "13px" }}>
+                        <p className="text-muted small mb-2" style={{ fontSize: "13px" }}>
                           {coupon.description}
                         </p>
+                      )}
+
+                      {/* Terms Note */}
+                      {coupon.terms_note && (
+                        <div className="p-2 mb-3 rounded-2 text-dark" style={{ background: "#fefce8", border: "1px solid #fef08a", fontSize: "11px" }}>
+                          <strong>ℹ️ Terms:</strong> {coupon.terms_note}
+                        </div>
                       )}
 
                       {/* Face Value & Total to Pay */}
@@ -223,12 +406,27 @@ export default function Marketplace() {
                       <div className="d-flex align-items-center justify-content-center gap-1 mb-2 text-primary small" style={{ fontSize: "11px" }}>
                         <span>🔒 100% Escrow Protected • Instant Refund Guarantee</span>
                       </div>
-                      <button
-                        className="btn btn-primary w-100 py-2"
-                        onClick={() => requestCoupon(coupon.id)}
-                      >
-                        Request & Pay ₹{totalPrice}
-                      </button>
+                      {coupon.is_owner ? (
+                        <div>
+                          <button
+                            className="btn btn-outline-secondary w-100 py-2 disabled"
+                            style={{ cursor: "not-allowed", opacity: 0.85 }}
+                            disabled
+                          >
+                            🏷️ Your Listing (Live on Marketplace)
+                          </button>
+                          <span className="text-muted d-block text-center mt-1" style={{ fontSize: "11px" }}>
+                            Visible to all buyers. You receive ₹{ownerPayout} when purchased.
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          className="btn btn-primary w-100 py-2"
+                          onClick={() => requestCoupon(coupon.id)}
+                        >
+                          Request & Pay ₹{totalPrice}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

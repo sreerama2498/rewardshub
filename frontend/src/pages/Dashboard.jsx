@@ -144,7 +144,7 @@ export default function Dashboard() {
 
           setStats(statsResponse.data);
 
-        } catch (error) {
+        } catch {
 
           console.log("Stats API not available");
 
@@ -165,7 +165,7 @@ export default function Dashboard() {
             activityResponse.data
           );
 
-        } catch (error) {
+        } catch {
 
           console.log("Activity API not available");
 
@@ -185,7 +185,7 @@ export default function Dashboard() {
 
     loadDashboard();
 
-  }, []);
+  }, [navigate]);
 
   const openStatsModal = async (
     type,

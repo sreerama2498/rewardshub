@@ -1,5 +1,3 @@
-import React from "react";
-
 // Curated dictionary of major Indian & Global consumer brands / apps with their brand assets, colors, and keywords
 export const BRAND_CONFIGS = [
   // Payments / UPI / Wallets

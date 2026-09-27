@@ -30,10 +30,6 @@ export default function Profile() {
   const [updatingProfile, setUpdatingProfile] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
-
   const loadProfile = async () => {
     try {
       const [profileRes, walletRes] = await Promise.all([
@@ -61,6 +57,10 @@ export default function Profile() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
 
   const handleTopup = async (amount) => {
     setTopupLoading(true);

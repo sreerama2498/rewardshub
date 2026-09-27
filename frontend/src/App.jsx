@@ -16,6 +16,7 @@ import AdminPanel from "./pages/AdminPanel";
 import Notifications from "./pages/Notifications";
 import Marketplace from "./pages/Marketplace";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import AdminRoute from "./routes/AdminRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
@@ -94,9 +95,9 @@ function App() {
         <Route
           path="/admin"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <AdminPanel />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
 

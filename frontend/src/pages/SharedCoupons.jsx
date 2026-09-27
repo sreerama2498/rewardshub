@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/LoadingSpinner";
+import CouponLogo from "../components/CouponLogo";
 import { toast } from "react-toastify";
 
 export default function SharedCoupons() {
@@ -155,33 +156,64 @@ export default function SharedCoupons() {
               <div className="card h-100 shadow-sm border-0" style={{ borderRadius: "14px", border: "1px solid #e2e8f0" }}>
                 <div className="card-body p-4 d-flex flex-column justify-content-between">
                   <div>
-                    <div className="d-flex align-items-center justify-content-between mb-3">
-                      <span className="badge-soft badge-soft-primary">
-                        Share #{share.id}
-                      </span>
-                      <span className={`badge-soft ${
-                        share.status === "ACCEPTED" ? "badge-soft-success" :
-                        share.status === "REJECTED" ? "badge-soft-danger" : "badge-soft-warning"
-                      }`}>
-                        {share.status || "PENDING"}
-                      </span>
+                    <div className="d-flex align-items-start justify-content-between gap-2 mb-3">
+                      <CouponLogo
+                        title={share.coupon_title}
+                        sourceApp={share.source_app}
+                        description={share.coupon_description}
+                        size={44}
+                      />
+                      <div className="d-flex flex-column align-items-end gap-1">
+                        <span className={`badge-soft ${
+                          share.status === "ACCEPTED" ? "badge-soft-success" :
+                          share.status === "REJECTED" ? "badge-soft-danger" : "badge-soft-warning"
+                        }`}>
+                          {share.status || "PENDING"}
+                        </span>
+                        {share.source_app && (
+                          <span className="badge bg-light text-secondary border px-2 py-1 rounded-pill small" style={{ fontSize: "10px" }}>
+                            {share.source_app}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    <h5 className="fw-bold text-dark mb-1">
-                      Incoming Coupon Gift
+                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: "16px" }}>
+                      {share.coupon_title || "Shared Coupon Gift"}
                     </h5>
-                    <p className="text-muted small mb-3">
-                      A coupon was shared with your account.
-                    </p>
+                    {share.coupon_description && (
+                      <p className="text-muted small mb-2" style={{ fontSize: "12px" }}>
+                        {share.coupon_description}
+                      </p>
+                    )}
+
+                    <div className="p-2 mb-3 rounded-2 text-dark" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: "11px" }}>
+                      <div className="d-flex justify-content-between mb-1">
+                        <span className="text-muted">From:</span>
+                        <strong>{share.sender_name || "A friend"} ({share.sender_email})</strong>
+                      </div>
+                      {share.coupon_value > 0 && (
+                        <div className="d-flex justify-content-between mb-1">
+                          <span className="text-muted">Face Value:</span>
+                          <strong className="text-success">₹{share.coupon_value}</strong>
+                        </div>
+                      )}
+                      {share.expiry_date && (
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Expires:</span>
+                          <strong>{share.expiry_date}</strong>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {share.status === "PENDING" && (
-                    <div className="d-flex gap-2 pt-3 border-top" style={{ borderColor: "#f1f5f9" }}>
+                  {share.status === "PENDING" ? (
+                    <div className="d-flex gap-2 pt-2 border-top" style={{ borderColor: "#f1f5f9" }}>
                       <button
-                        className="btn btn-primary flex-grow-1 btn-sm py-2"
+                        className="btn btn-primary flex-grow-1 btn-sm py-2 fw-semibold"
                         onClick={() => acceptShare(share.id)}
                       >
-                        Accept
+                        🎁 Accept Gift
                       </button>
                       <button
                         className="btn btn-outline-danger btn-sm px-3"
@@ -189,6 +221,18 @@ export default function SharedCoupons() {
                       >
                         Decline
                       </button>
+                    </div>
+                  ) : share.status === "ACCEPTED" ? (
+                    <div className="text-center pt-2 border-top">
+                      <span className="text-success small fw-semibold">
+                        ✓ Added to your My Coupons!
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-center pt-2 border-top">
+                      <span className="text-muted small">
+                        Offer declined
+                      </span>
                     </div>
                   )}
                 </div>

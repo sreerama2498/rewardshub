@@ -16,11 +16,7 @@ export default function NotificationBadge() {
     );
 
     if (!token) {
-
-      setCount(0);
-
       return;
-
     }
 
     try {

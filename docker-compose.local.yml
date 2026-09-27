@@ -16,6 +16,9 @@ services:
       start_period: 10s
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5433:5432"
 
   backend:
     build:
@@ -25,7 +28,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-rewardshub}
       SECRET_KEY: ${SECRET_KEY}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:3000,http://localhost:8001,http://127.0.0.1:8001}
       TZ: Asia/Kolkata
     depends_on:
       postgres:

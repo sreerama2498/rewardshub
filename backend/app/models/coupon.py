@@ -30,11 +30,67 @@ class Coupon(Base):
     )
     coupon_code = Column(
         String,
-        nullable=False
+        nullable=True
+    )
+    redemption_url = Column(
+        String,
+        nullable=True
+    )
+    category = Column(
+        String,
+        default="OTHER",
+        index=True
+    )
+    security_pin = Column(
+        String,
+        nullable=True
+    )
+    terms_note = Column(
+        String,
+        nullable=True
+    )
+    discount_type = Column(
+        String,
+        default="FLAT_AMOUNT",
+        index=True
+    )
+    discount_percent = Column(
+        Integer,
+        default=0
+    )
+    max_discount_cap = Column(
+        Integer,
+        default=0
+    )
+    min_order_value = Column(
+        Integer,
+        default=0
+    )
+    bogo_details = Column(
+        String,
+        nullable=True
+    )
+    free_gift_details = Column(
+        String,
+        nullable=True
+    )
+    distribution_channel = Column(
+        String,
+        default="DIGITAL",
+        index=True
+    )
+    target_audience = Column(
+        String,
+        default="ALL_USERS"
+    )
+    usage_structure = Column(
+        String,
+        default="SINGLE_USE"
     )
     expiry_date = Column(
         Date,
-        nullable=True
+        nullable=True,
+        index=True
     )
     is_shared = Column(
         Boolean,
@@ -42,7 +98,8 @@ class Coupon(Base):
     )
     owner_id = Column(
         Integer,
-        ForeignKey("users.id", ondelete="CASCADE")
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True
     )
     coupon_value = Column(
         Integer,
@@ -50,7 +107,8 @@ class Coupon(Base):
     )
     status = Column(
         String,
-        default="AVAILABLE"
+        default="AVAILABLE",
+        index=True
     )
     is_ocr_verified = Column(
         Boolean,
@@ -66,15 +124,20 @@ class Coupon(Base):
     )
     buyer_id = Column(
         Integer,
-        nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
     )
     seller_id = Column(
         Integer,
-        nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
     )
     created_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(timezone.utc),
+        index=True
     )
     updated_at = Column(
         DateTime,

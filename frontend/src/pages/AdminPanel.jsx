@@ -22,10 +22,6 @@ export default function AdminPanel() {
       ? logs
       : logs.filter((log) => log.category === activityFilter);
 
-  useEffect(() => {
-    loadAdminData();
-  }, []);
-
   const loadAdminData = async () => {
     try {
       const [statsRes, usersRes, logsRes, txnsRes] = await Promise.all([
@@ -46,6 +42,10 @@ export default function AdminPanel() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadAdminData();
+  }, []);
 
   const viewCoupons = async (userId, userName) => {
     try {

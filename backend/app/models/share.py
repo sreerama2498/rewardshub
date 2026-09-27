@@ -20,27 +20,32 @@ class CouponShare(Base):
 
     coupon_id = Column(
         Integer,
-        ForeignKey("coupons.id", ondelete="CASCADE")
+        ForeignKey("coupons.id", ondelete="CASCADE"),
+        index=True
     )
 
     sender_id = Column(
         Integer,
-        ForeignKey("users.id", ondelete="CASCADE")
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True
     )
 
     receiver_id = Column(
         Integer,
-        ForeignKey("users.id", ondelete="CASCADE")
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True
     )
 
     status = Column(
         String,
-        default="PENDING"
+        default="PENDING",
+        index=True
     )
 
     created_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(timezone.utc),
+        index=True
     )
 
     updated_at = Column(

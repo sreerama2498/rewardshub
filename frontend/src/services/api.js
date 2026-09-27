@@ -34,6 +34,11 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401) {
 
+      // Do not redirect or wipe session if the 401 was from an explicit login attempt
+      if (error.config?.url?.includes("/login")) {
+        return Promise.reject(error);
+      }
+
       localStorage.removeItem("token");
 
       toast.error(

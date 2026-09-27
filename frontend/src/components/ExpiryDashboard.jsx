@@ -18,12 +18,6 @@ export default function ExpiryDashboard() {
   const [modalCoupons, setModalCoupons] =
     useState([]);
 
-  useEffect(() => {
-
-    loadExpiryData();
-
-  }, []);
-
   const loadExpiryData =
     async () => {
 
@@ -56,6 +50,12 @@ export default function ExpiryDashboard() {
     }
 
   };
+
+  useEffect(() => {
+
+    loadExpiryData();
+
+  }, []);
 
   const openModal = (
     title,

@@ -14,12 +14,6 @@ export default function SentShares() {
   const [loading, setLoading] =
     useState(true);
 
-  useEffect(() => {
-
-    loadShares();
-
-  }, []);
-
   const loadShares = async () => {
 
     try {
@@ -55,6 +49,12 @@ export default function SentShares() {
     }
 
   };
+
+  useEffect(() => {
+
+    loadShares();
+
+  }, []);
 
   if (loading) {
 

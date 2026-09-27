@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { detectBrand } from "../utils/brandLogos";
 
 export default function CouponLogo({ title = "", sourceApp = "", description = "", size = 44, className = "" }) {

@@ -22,11 +22,14 @@ class AuditLog(Base):
 
     user_id = Column(
         Integer,
-        ForeignKey("users.id", ondelete="CASCADE")
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
     )
 
     action = Column(
-        String
+        String,
+        index=True
     )
 
     details = Column(
@@ -35,5 +38,6 @@ class AuditLog(Base):
 
     created_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(timezone.utc),
+        index=True
     )

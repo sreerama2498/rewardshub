@@ -21,19 +21,22 @@ class Transaction(Base):
     coupon_id = Column(
         Integer,
         ForeignKey("coupons.id", ondelete="SET NULL"),
-        nullable=True
+        nullable=True,
+        index=True
     )
 
     buyer_id = Column(
         Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
     )
 
     owner_id = Column(
         Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
     )
 
     total_amount = Column(
@@ -58,7 +61,8 @@ class Transaction(Base):
 
     status = Column(
         String,
-        default="COMPLETED"
+        default="COMPLETED",
+        index=True
     )
 
     description = Column(
@@ -68,5 +72,6 @@ class Transaction(Base):
 
     created_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(timezone.utc),
+        index=True
     )

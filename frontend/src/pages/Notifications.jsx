@@ -9,10 +9,6 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState("ALL"); // ALL, UNREAD, READ
 
-  useEffect(() => {
-    loadNotifications();
-  }, []);
-
   const loadNotifications = async () => {
     try {
       const response = await api.get("/notifications");
@@ -24,6 +20,10 @@ export default function Notifications() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
 
   const markRead = async (id) => {
     try {
