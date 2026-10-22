@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import api from "../services/api";
 import { toast } from "react-toastify";
+import { triggerConfetti } from "../utils/confetti";
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -34,6 +35,7 @@ export default function Users() {
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(userEmail);
     }
+    triggerConfetti();
     toast.success(`Copied ${userEmail} to clipboard! Paste it into 'My Coupons' to share a gift.`);
   };
 
@@ -103,9 +105,7 @@ export default function Users() {
         <div className="row g-3">
           {filteredUsers.map((user) => {
             const isMe = currentUser && currentUser.id === user.id;
-            const initials = user.name
-              ? user.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()
-              : "U";
+            const avatarUrl = `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user.name || user.email)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
 
             return (
               <div key={user.id} className="col-12 col-md-6 col-lg-4">
@@ -119,19 +119,18 @@ export default function Users() {
                 >
                   <div className="card-body p-4 d-flex flex-column justify-content-between">
                     <div className="d-flex align-items-start gap-3 mb-3">
-                      <div
-                        className="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0 fw-bold text-white shadow-sm"
+                      <img
+                        src={avatarUrl}
+                        alt={user.name}
+                        className="rounded-circle shadow-sm flex-shrink-0"
                         style={{
-                          width: "50px",
-                          height: "50px",
-                          background: isMe
-                            ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                            : "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
-                          fontSize: "17px"
+                          width: "52px",
+                          height: "52px",
+                          border: isMe ? "2px solid #10b981" : "2px solid #e2e8f0",
+                          backgroundColor: "#f8fafc"
                         }}
-                      >
-                        {initials}
-                      </div>
+                        loading="lazy"
+                      />
 
                       <div className="flex-grow-1 overflow-hidden">
                         <div className="d-flex align-items-center justify-content-between mb-1 gap-1">

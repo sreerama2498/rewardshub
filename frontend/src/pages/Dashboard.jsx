@@ -258,27 +258,40 @@ export default function Dashboard() {
       >
         <div className="card-body p-4 position-relative" style={{ zIndex: 1 }}>
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div>
-              <div className="d-flex align-items-center gap-2 mb-2">
-                <span className="badge bg-white text-dark fw-bold px-2 py-1 rounded-pill">
-                  {user.role === "ADMIN" ? "👑 Admin Account" : "✨ Member"}
-                </span>
-                <span className="text-white-50 small">ID: #{user.id}</span>
-              </div>
-              <h2 className="text-white fw-bold mb-1" style={{ fontSize: "28px" }}>
-                Welcome back, {user.name}! 👋
-              </h2>
-              <p className="text-white-50 mb-3">
-                {user.email} • Track, share, and redeem your rewards effortlessly
-              </p>
-              <div className="d-flex align-items-center gap-3">
-                <div className="bg-white bg-opacity-10 px-3 py-1 rounded-3 border border-white border-opacity-20">
-                  <span className="text-white-50 small d-block" style={{ fontSize: "11px" }}>WALLET BALANCE</span>
-                  <span className="fw-bold text-white fs-6">💳 ₹{user.wallet_balance || 0}</span>
+            <div className="d-flex align-items-center gap-3">
+              <img
+                src={`https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(user.name || user.email)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`}
+                alt={user.name}
+                className="rounded-circle shadow-lg flex-shrink-0"
+                style={{
+                  width: "72px",
+                  height: "72px",
+                  border: "3px solid rgba(255, 255, 255, 0.8)",
+                  backgroundColor: "rgba(255, 255, 255, 0.2)"
+                }}
+              />
+              <div>
+                <div className="d-flex align-items-center gap-2 mb-2">
+                  <span className="badge bg-white text-dark fw-bold px-2 py-1 rounded-pill">
+                    {user.role === "ADMIN" ? "👑 Admin Account" : "✨ Member"}
+                  </span>
+                  <span className="text-white-50 small">ID: #{user.id}</span>
                 </div>
-                <div className="bg-white bg-opacity-10 px-3 py-1 rounded-3 border border-white border-opacity-20">
-                  <span className="text-white-50 small d-block" style={{ fontSize: "11px" }}>EARNINGS CREDITED</span>
-                  <span className="fw-bold text-white fs-6">💰 ₹{user.total_earned || 0}</span>
+                <h2 className="text-white fw-bold mb-1" style={{ fontSize: "28px" }}>
+                  Welcome back, {user.name}! 👋
+                </h2>
+                <p className="text-white-50 mb-3">
+                  {user.email} • Track, share, and redeem your rewards effortlessly
+                </p>
+                <div className="d-flex align-items-center gap-3">
+                  <div className="bg-white bg-opacity-10 px-3 py-1 rounded-3 border border-white border-opacity-20">
+                    <span className="text-white-50 small d-block" style={{ fontSize: "11px" }}>WALLET BALANCE</span>
+                    <span className="fw-bold text-white fs-6">💳 ₹{user.wallet_balance || 0}</span>
+                  </div>
+                  <div className="bg-white bg-opacity-10 px-3 py-1 rounded-3 border border-white border-opacity-20">
+                    <span className="text-white-50 small d-block" style={{ fontSize: "11px" }}>EARNINGS CREDITED</span>
+                    <span className="fw-bold text-white fs-6">💰 ₹{user.total_earned || 0}</span>
+                  </div>
                 </div>
               </div>
             </div>

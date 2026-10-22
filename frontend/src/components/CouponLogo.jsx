@@ -27,8 +27,8 @@ export default function CouponLogo({ title = "", sourceApp = "", description = "
     );
   }
 
-  // Primary: Logo image from Google Favicon High-Res service (reliable, always up-to-date)
-  const faviconUrl = `https://www.google.com/s2/favicons?domain=${brand.domain}&sz=128`;
+  // Primary: Logo image from high-resolution Unavatar API with Google Favicon fallback
+  const faviconUrl = `https://unavatar.io/${brand.domain}?fallback=https://www.google.com/s2/favicons?domain=${brand.domain}&sz=128`;
 
   return (
     <div

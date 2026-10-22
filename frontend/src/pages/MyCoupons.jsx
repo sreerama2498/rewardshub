@@ -6,6 +6,7 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import CouponLogo from "../components/CouponLogo";
 
 import { toast } from "react-toastify";
+import { triggerConfetti } from "../utils/confetti";
 
 const MY_CATEGORIES = [
   { id: "FOOD", label: "Food & Dining", icon: "🍔" },
@@ -203,6 +204,7 @@ export default function MyCoupons() {
     if (!window.confirm("Did the coupon work successfully? This will release the escrow payout to the seller.")) return;
     try {
       const response = await api.post(`/coupons/${couponId}/confirm-redeem`);
+      triggerConfetti();
       toast.success(response.data.message || "Coupon confirmed! Payout released to seller.");
       loadCoupons();
     } catch (err) {
@@ -267,6 +269,7 @@ export default function MyCoupons() {
         }
       );
 
+      triggerConfetti();
       toast.success(
         "Coupon Created & Published to Marketplace!"
       );

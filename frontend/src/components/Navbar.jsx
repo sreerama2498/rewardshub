@@ -7,6 +7,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [userRole, setUserRole] = useState(null);
+  const [userName, setUserName] = useState(null);
   const [walletBalance, setWalletBalance] = useState(null);
 
   useEffect(() => {
@@ -26,6 +27,9 @@ export default function Navbar() {
       .then((res) => {
         if (res.data?.role) {
           setUserRole(res.data.role);
+        }
+        if (res.data?.name) {
+          setUserName(res.data.name);
         }
         if (res.data?.wallet_balance !== undefined) {
           setWalletBalance(res.data.wallet_balance);
@@ -120,6 +124,24 @@ export default function Navbar() {
           <div className="ms-1">
             <NotificationBadge />
           </div>
+
+          {/* User Avatar with Profile Link */}
+          {userName && (
+            <img
+              src={`https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(userName)}&backgroundColor=b6e3f4,c0aede,d1d4f9`}
+              alt={userName}
+              className="rounded-circle shadow-sm ms-2"
+              style={{
+                width: "36px",
+                height: "36px",
+                cursor: "pointer",
+                border: "2px solid #6366f1",
+                backgroundColor: "#f8fafc"
+              }}
+              onClick={() => navigate("/profile")}
+              title={`Signed in as ${userName} - Click to open Profile`}
+            />
+          )}
 
           {/* Logout */}
           <button

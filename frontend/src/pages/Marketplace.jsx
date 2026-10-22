@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import CouponLogo from "../components/CouponLogo";
 
 import { toast } from "react-toastify";
+import { triggerSuperConfetti } from "../utils/confetti";
 
 const CATEGORIES = [
   { id: "ALL", label: "All Categories", icon: "🌐" },
@@ -77,6 +78,7 @@ export default function Marketplace() {
       const response = await api.post(`/request-coupon/${couponId}`, {});
 
       setPurchasedReceipt(response.data);
+      triggerSuperConfetti();
       toast.success(response.data.message);
       loadMarketplace();
     } catch (error) {
