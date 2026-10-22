@@ -18,6 +18,9 @@ class CouponCreate(BaseModel):
     min_order_value: int | None = 0
     bogo_details: str | None = None
     free_gift_details: str | None = None
+    cashback_amount: int | None = 0
+    subscription_period: str | None = None
+    tier_details: str | None = None
     distribution_channel: str | None = "DIGITAL"
     target_audience: str | None = "ALL_USERS"
     usage_structure: str | None = "SINGLE_USE"

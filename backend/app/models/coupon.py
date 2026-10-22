@@ -74,6 +74,18 @@ class Coupon(Base):
         String,
         nullable=True
     )
+    cashback_amount = Column(
+        Integer,
+        default=0
+    )
+    subscription_period = Column(
+        String,
+        nullable=True
+    )
+    tier_details = Column(
+        String,
+        nullable=True
+    )
     distribution_channel = Column(
         String,
         default="DIGITAL",

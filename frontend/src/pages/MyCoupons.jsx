@@ -11,21 +11,27 @@ import { triggerConfetti } from "../utils/confetti";
 const MY_CATEGORIES = [
   { id: "FOOD", label: "Food & Dining", icon: "🍔" },
   { id: "FASHION", label: "Fashion & Shopping", icon: "🛍️" },
+  { id: "GROCERY", label: "Grocery & Quick Comm", icon: "🛒" },
   { id: "TRAVEL", label: "Travel & Commute", icon: "✈️" },
   { id: "ENTERTAINMENT", label: "OTT & Entertainment", icon: "🎬" },
   { id: "HEALTH", label: "Health & Wellness", icon: "💊" },
-  { id: "EDTECH", label: "EdTech & Courses", icon: "🎓" },
   { id: "GAMING", label: "Gaming & Digital", icon: "🎮" },
+  { id: "EDTECH", label: "EdTech & Courses", icon: "🎓" },
+  { id: "FINTECH", label: "Fintech, Bills & Recharge", icon: "💳" },
   { id: "OTHER", label: "Other Offers", icon: "🏷️" }
 ];
 
 const DISCOUNT_TYPES = [
-  { id: "FLAT_AMOUNT", label: "Fixed Amount-Off", icon: "💵", example: "e.g. ₹100 Off on ₹500 spend" },
-  { id: "PERCENTAGE", label: "Percentage-Off", icon: "🏷️", example: "e.g. 20% Off up to ₹150" },
-  { id: "BOGO", label: "Buy-One-Get-One (BOGO)", icon: "🎁", example: "e.g. Buy 1 Get 1 Free on Pizzas" },
-  { id: "FREE_SHIPPING", label: "Free Shipping", icon: "🚚", example: "e.g. Free Delivery on orders ₹199+" },
-  { id: "FREE_GIFT", label: "Free Gift / Trial", icon: "✨", example: "e.g. 3-Month OTT Trial / Bonus item" },
-  { id: "TIERED", label: "Tiered / Threshold", icon: "📊", example: "e.g. ₹50 off ₹250, ₹150 off ₹750" }
+  { id: "FLAT_AMOUNT", label: "Fixed Amount-Off", icon: "💵", example: "Flat ₹150 OFF on cart" },
+  { id: "PERCENTAGE", label: "Percentage-Off", icon: "🏷️", example: "30% OFF up to ₹150" },
+  { id: "BOGO", label: "Buy-One-Get-One (BOGO)", icon: "🎁", example: "Buy 1 Get 1 Free on pizzas" },
+  { id: "FREE_SHIPPING", label: "Free Shipping", icon: "🚚", example: "Free delivery on orders ₹299+" },
+  { id: "FREE_GIFT", label: "Free Gift / Sample", icon: "✨", example: "Free trial kit with purchase" },
+  { id: "TIERED", label: "Tiered Threshold", icon: "📊", example: "Spend ₹1000 get ₹100, ₹2500 get ₹350" },
+  { id: "GIFT_CARD", label: "Prepaid Gift Card", icon: "💳", example: "Amazon / Flipkart ₹500 voucher with PIN" },
+  { id: "CASHBACK", label: "Cashback Voucher", icon: "🪙", example: "₹50 cashback in wallet after transaction" },
+  { id: "SUBSCRIPTION_PASS", label: "Subscription Pass", icon: "⭐", example: "3 Months Spotify / OTT Premium Free" },
+  { id: "RECHARGE_BILL", label: "Recharge & Bill Pay", icon: "⚡", example: "Flat ₹25 OFF on mobile / electricity bill" }
 ];
 
 const CHANNELS = [
@@ -70,6 +76,9 @@ export default function MyCoupons() {
   const [minOrderValue, setMinOrderValue] = useState("");
   const [bogoDetails, setBogoDetails] = useState("");
   const [freeGiftDetails, setFreeGiftDetails] = useState("");
+  const [cashbackAmount, setCashbackAmount] = useState("");
+  const [subscriptionPeriod, setSubscriptionPeriod] = useState("");
+  const [tierDetails, setTierDetails] = useState("");
 
   // Dynamic Distribution Channel Fields
   const [distributionChannel, setDistributionChannel] = useState("DIGITAL");
@@ -240,6 +249,9 @@ export default function MyCoupons() {
         else if (discountType === "FREE_SHIPPING") computedValue = 50;
         else if (discountType === "BOGO") computedValue = 250;
         else if (discountType === "FREE_GIFT") computedValue = 299;
+        else if (discountType === "CASHBACK") computedValue = parseInt(cashbackAmount, 10) || 50;
+        else if (discountType === "SUBSCRIPTION_PASS") computedValue = 299;
+        else if (discountType === "RECHARGE_BILL") computedValue = 50;
         else computedValue = 100;
       }
 
@@ -256,6 +268,9 @@ export default function MyCoupons() {
           min_order_value: parseInt(minOrderValue, 10) || 0,
           bogo_details: bogoDetails || null,
           free_gift_details: freeGiftDetails || null,
+          cashback_amount: parseInt(cashbackAmount, 10) || 0,
+          subscription_period: subscriptionPeriod || null,
+          tier_details: tierDetails || null,
           distribution_channel: distributionChannel,
           target_audience: targetAudience,
           usage_structure: usageStructure,
@@ -284,6 +299,9 @@ export default function MyCoupons() {
       setMinOrderValue("");
       setBogoDetails("");
       setFreeGiftDetails("");
+      setCashbackAmount("");
+      setSubscriptionPeriod("");
+      setTierDetails("");
       setDistributionChannel("DIGITAL");
       setTargetAudience("ALL_USERS");
       setUsageStructure("SINGLE_USE");
@@ -823,8 +841,11 @@ export default function MyCoupons() {
                 <input
                   className="form-control"
                   placeholder="e.g. Save ₹50 on ₹250, Save ₹150 on ₹750, Save ₹300 on ₹1500"
-                  value={termsNote}
-                  onChange={(e) => setTermsNote(e.target.value)}
+                  value={tierDetails || termsNote}
+                  onChange={(e) => {
+                    setTierDetails(e.target.value);
+                    if (!termsNote) setTermsNote(e.target.value);
+                  }}
                 />
               </div>
               <div className="col-12 col-md-4">
@@ -835,6 +856,128 @@ export default function MyCoupons() {
                   placeholder="e.g. 300"
                   value={couponValue}
                   onChange={(e) => setCouponValue(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* DYNAMIC FIELDS: GIFT_CARD */}
+          {discountType === "GIFT_CARD" && (
+            <div className="row g-2 p-3 bg-white rounded-3 border">
+              <div className="col-12 col-md-6">
+                <label className="form-label fw-semibold small text-dark">Gift Card Balance (₹) *</label>
+                <div className="input-group">
+                  <span className="input-group-text bg-light">₹</span>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 500"
+                    value={couponValue}
+                    onChange={(e) => setCouponValue(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="col-12 col-md-6">
+                <label className="form-label fw-semibold small text-dark">Secret PIN / Passcode (Optional)</label>
+                <input
+                  className="form-control"
+                  placeholder="e.g. 123456"
+                  value={securityPin}
+                  onChange={(e) => setSecurityPin(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* DYNAMIC FIELDS: CASHBACK */}
+          {discountType === "CASHBACK" && (
+            <div className="row g-2 p-3 bg-white rounded-3 border">
+              <div className="col-12 col-md-6">
+                <label className="form-label fw-semibold small text-dark">Cashback Benefit (₹) *</label>
+                <div className="input-group">
+                  <span className="input-group-text bg-light">₹</span>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 100"
+                    value={cashbackAmount || couponValue}
+                    onChange={(e) => {
+                      setCashbackAmount(e.target.value);
+                      setCouponValue(e.target.value);
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="col-12 col-md-6">
+                <label className="form-label fw-semibold small text-dark">Minimum Transaction Spend (₹)</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  placeholder="e.g. 499 (0 if no minimum)"
+                  value={minOrderValue}
+                  onChange={(e) => setMinOrderValue(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* DYNAMIC FIELDS: SUBSCRIPTION_PASS */}
+          {discountType === "SUBSCRIPTION_PASS" && (
+            <div className="row g-2 p-3 bg-white rounded-3 border">
+              <div className="col-12 col-md-6">
+                <label className="form-label fw-semibold small text-dark">Subscription Duration *</label>
+                <input
+                  className="form-control"
+                  placeholder="e.g. 3 Months Free Premium, 1-Year Pass"
+                  value={subscriptionPeriod}
+                  onChange={(e) => setSubscriptionPeriod(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="col-12 col-md-6">
+                <label className="form-label fw-semibold small text-dark">Equivalent Market Value (₹) *</label>
+                <div className="input-group">
+                  <span className="input-group-text bg-light">₹</span>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 299"
+                    value={couponValue}
+                    onChange={(e) => setCouponValue(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DYNAMIC FIELDS: RECHARGE_BILL */}
+          {discountType === "RECHARGE_BILL" && (
+            <div className="row g-2 p-3 bg-white rounded-3 border">
+              <div className="col-12 col-md-6">
+                <label className="form-label fw-semibold small text-dark">Bill Discount / Rebate Amount (₹) *</label>
+                <div className="input-group">
+                  <span className="input-group-text bg-light">₹</span>
+                  <input
+                    type="number"
+                    className="form-control"
+                    placeholder="e.g. 50"
+                    value={couponValue}
+                    onChange={(e) => setCouponValue(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="col-12 col-md-6">
+                <label className="form-label fw-semibold small text-dark">Minimum Recharge / Bill Spend (₹)</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  placeholder="e.g. 199"
+                  value={minOrderValue}
+                  onChange={(e) => setMinOrderValue(e.target.value)}
                 />
               </div>
             </div>
@@ -1183,6 +1326,31 @@ export default function MyCoupons() {
                           {coupon.discount_type === "FREE_GIFT" && (
                             <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill small" style={{ fontSize: "10px" }}>
                               ✨ Free Gift / Trial
+                            </span>
+                          )}
+                          {coupon.discount_type === "GIFT_CARD" && (
+                            <span className="badge bg-purple bg-opacity-10 text-dark border border-secondary border-opacity-25 px-2 py-1 rounded-pill small fw-bold" style={{ fontSize: "10px" }}>
+                              💳 Gift Card (₹{coupon.coupon_value})
+                            </span>
+                          )}
+                          {coupon.discount_type === "CASHBACK" && (
+                            <span className="badge bg-warning bg-opacity-25 text-dark border border-warning px-2 py-1 rounded-pill small fw-bold" style={{ fontSize: "10px" }}>
+                              🪙 Cashback (₹{coupon.cashback_amount || coupon.coupon_value})
+                            </span>
+                          )}
+                          {coupon.discount_type === "SUBSCRIPTION_PASS" && (
+                            <span className="badge bg-info bg-opacity-10 text-dark border border-info border-opacity-25 px-2 py-1 rounded-pill small fw-bold" style={{ fontSize: "10px" }}>
+                              ⭐ Subscription Pass
+                            </span>
+                          )}
+                          {coupon.discount_type === "RECHARGE_BILL" && (
+                            <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill small fw-bold" style={{ fontSize: "10px" }}>
+                              ⚡ Bill / Recharge Rebate
+                            </span>
+                          )}
+                          {coupon.discount_type === "TIERED" && (
+                            <span className="badge bg-dark text-white px-2 py-1 rounded-pill small fw-bold" style={{ fontSize: "10px" }}>
+                              📊 Tiered Offer
                             </span>
                           )}
                           {coupon.target_audience === "NEW_USERS" && (

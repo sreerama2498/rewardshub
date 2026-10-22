@@ -12,11 +12,13 @@ const CATEGORIES = [
   { id: "ALL", label: "All Categories", icon: "🌐" },
   { id: "FOOD", label: "Food & Dining", icon: "🍔" },
   { id: "FASHION", label: "Fashion & Shopping", icon: "🛍️" },
+  { id: "GROCERY", label: "Grocery & Quick Comm", icon: "🛒" },
   { id: "TRAVEL", label: "Travel & Commute", icon: "✈️" },
   { id: "ENTERTAINMENT", label: "OTT & Entertainment", icon: "🎬" },
   { id: "HEALTH", label: "Health & Wellness", icon: "💊" },
-  { id: "EDTECH", label: "EdTech & Courses", icon: "🎓" },
   { id: "GAMING", label: "Gaming & Digital", icon: "🎮" },
+  { id: "EDTECH", label: "EdTech & Courses", icon: "🎓" },
+  { id: "FINTECH", label: "Fintech, Bills & Recharge", icon: "💳" },
   { id: "OTHER", label: "Other Offers", icon: "🏷️" }
 ];
 
@@ -27,7 +29,11 @@ const MARKET_DISCOUNT_TYPES = [
   { id: "BOGO", label: "BOGO", icon: "🎁" },
   { id: "FREE_SHIPPING", label: "Free Shipping", icon: "🚚" },
   { id: "FREE_GIFT", label: "Free Gift / Trial", icon: "✨" },
-  { id: "TIERED", label: "Tiered Threshold", icon: "📊" }
+  { id: "TIERED", label: "Tiered Threshold", icon: "📊" },
+  { id: "GIFT_CARD", label: "Prepaid Gift Card", icon: "💳" },
+  { id: "CASHBACK", label: "Cashback Voucher", icon: "🪙" },
+  { id: "SUBSCRIPTION_PASS", label: "Subscription Pass", icon: "⭐" },
+  { id: "RECHARGE_BILL", label: "Recharge & Bill Pay", icon: "⚡" }
 ];
 
 const POPULAR_BRANDS = ["ALL", "Swiggy", "Zomato", "Myntra", "Amazon", "Flipkart", "Ajio", "Domino's", "Uber"];
@@ -396,6 +402,31 @@ export default function Marketplace() {
                         {coupon.discount_type === "FREE_GIFT" && (
                           <span className="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2 py-1 rounded-pill small fw-bold">
                             ✨ Free Gift / Trial {coupon.free_gift_details ? `(${coupon.free_gift_details})` : ""}
+                          </span>
+                        )}
+                        {coupon.discount_type === "GIFT_CARD" && (
+                          <span className="badge bg-purple bg-opacity-10 text-dark border border-secondary border-opacity-25 px-2 py-1 rounded-pill small fw-bold">
+                            💳 Prepaid Gift Card (₹{val})
+                          </span>
+                        )}
+                        {coupon.discount_type === "CASHBACK" && (
+                          <span className="badge bg-warning bg-opacity-25 text-dark border border-warning px-2 py-1 rounded-pill small fw-bold">
+                            🪙 ₹{coupon.cashback_amount || val} Cashback {coupon.min_order_value ? `(Min ₹${coupon.min_order_value})` : ""}
+                          </span>
+                        )}
+                        {coupon.discount_type === "SUBSCRIPTION_PASS" && (
+                          <span className="badge bg-info bg-opacity-10 text-dark border border-info border-opacity-25 px-2 py-1 rounded-pill small fw-bold">
+                            ⭐ Subscription Pass {coupon.subscription_period ? `(${coupon.subscription_period})` : ""}
+                          </span>
+                        )}
+                        {coupon.discount_type === "RECHARGE_BILL" && (
+                          <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1 rounded-pill small fw-bold">
+                            ⚡ Bill / Recharge Rebate (₹{val})
+                          </span>
+                        )}
+                        {coupon.discount_type === "TIERED" && (
+                          <span className="badge bg-dark text-white px-2 py-1 rounded-pill small fw-bold">
+                            📊 Tiered Offer {coupon.tier_details ? `(${coupon.tier_details})` : ""}
                           </span>
                         )}
                         {coupon.min_order_value > 0 && coupon.discount_type !== "FREE_SHIPPING" && (
