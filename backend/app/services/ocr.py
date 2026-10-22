@@ -2,6 +2,7 @@ import io
 import re
 import base64
 import json
+from datetime import date, timedelta
 
 try:
     from PIL import Image, ImageFilter, ImageEnhance
@@ -120,29 +121,99 @@ def extract_candidate_codes(raw_text: str) -> list[str]:
 # Structured field parser – new in this version
 # ---------------------------------------------------------------------------
 
-def _parse_expiry(text: str):
-    """Try several date patterns and return YYYY-MM-DD or None."""
-    # DD/MM/YYYY or DD-MM-YYYY
-    m = re.search(
-        r"(?i)(?:expires?|valid\s*(?:till|through|until|upto)|validity)[\s\w:–-]*?(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{2,4})",
-        text,
-    )
-    if m:
-        d, mo, y = m.group(1).zfill(2), m.group(2).zfill(2), m.group(3)
-        if len(y) == 2:
-            y = "20" + y
-        return f"{y}-{mo}-{d}"
+def _clean_date(y, m, d):
+    try:
+        y, m, d = int(y), int(m), int(d)
+        if y < 100:
+            y += 2000
+        return date(y, m, d).strftime("%Y-%m-%d")
+    except Exception:
+        return None
 
-    # 15 Nov 2026 / 15th November 2026
-    m2 = re.search(
-        r"(?i)(?:expires?|valid\s*(?:till|through|until|upto)|validity)[\s\w:–-]*?(\d{1,2})(?:st|nd|rd|th)?\s+([a-zA-Z]{3,9})\s+(\d{4})",
-        text,
-    )
-    if m2:
-        d = m2.group(1).zfill(2)
-        mon = _MONTHS.get(m2.group(2).lower()[:3])
+
+def _parse_expiry(text: str) -> str | None:
+    """
+    Robust, comprehensive date parser for coupon vouchers.
+    Extracts dates in US, Indian, UK, ISO, relative, and delimiter formats.
+    """
+    if not text:
+        return None
+
+    today = date.today()
+    current_year = today.year
+
+    # 1. Relative validity: 'expires in 5 days', 'valid for 30 days', 'valid for 3 months'
+    rel = re.search(r"(?i)(?:expires?|valid(?:ity)?)\s*(?:in|for)\s*(\d{1,3})\s*(days?|months?|weeks?)", text)
+    if rel:
+        qty, unit = int(rel.group(1)), rel.group(2).lower()
+        if "day" in unit:
+            return (today + timedelta(days=qty)).strftime("%Y-%m-%d")
+        elif "week" in unit:
+            return (today + timedelta(days=qty * 7)).strftime("%Y-%m-%d")
+        elif "month" in unit:
+            return (today + timedelta(days=qty * 30)).strftime("%Y-%m-%d")
+
+    # 2. ISO format: 2026-12-31, 2026/12/31, 2026.12.31
+    m_iso = re.search(r"\b(202[4-9]|203\d)[/\-\.](0?[1-9]|1[0-2])[/\-\.](0?[1-9]|[12]\d|3[01])\b", text)
+    if m_iso:
+        res = _clean_date(m_iso.group(1), m_iso.group(2), m_iso.group(3))
+        if res:
+            return res
+
+    # 3. Day Month Year: '31 Dec 2026', '31st December 2026', '31-Oct-2026', '31.12.2026'
+    m_dmy = re.search(r"\b(0?[1-9]|[12]\d|3[01])(?:st|nd|rd|th)?[\s\-_]+([a-zA-Z]{3,9})[\s\-_,]+(202[4-9]|203\d|\d{2})\b", text)
+    if m_dmy:
+        mon_str = m_dmy.group(2).lower()[:3]
+        mon = _MONTHS.get(mon_str) or _MONTHS.get(m_dmy.group(2).lower())
         if mon:
-            return f"{m2.group(3)}-{mon}-{d}"
+            res = _clean_date(m_dmy.group(3), mon, m_dmy.group(1))
+            if res:
+                return res
+
+    # 4. Month Day Year: 'Dec 31, 2026', 'December 31st 2026', 'Oct 15, 2026'
+    m_mdy = re.search(r"\b([a-zA-Z]{3,9})\s+(0?[1-9]|[12]\d|3[01])(?:st|nd|rd|th)?,?\s+(202[4-9]|203\d|\d{2})\b", text)
+    if m_mdy:
+        mon_str = m_mdy.group(1).lower()[:3]
+        mon = _MONTHS.get(mon_str) or _MONTHS.get(m_mdy.group(1).lower())
+        if mon:
+            res = _clean_date(m_mdy.group(3), mon, m_mdy.group(2))
+            if res:
+                return res
+
+    # 5. Delimited numeric date: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+    m_delim = re.search(r"\b(0?[1-9]|[12]\d|3[01])[/\-\.](0?[1-9]|1[0-2])[/\-\.](202[4-9]|203\d|\d{2})\b", text)
+    if m_delim:
+        d, mo, y = int(m_delim.group(1)), int(m_delim.group(2)), int(m_delim.group(3))
+        res = _clean_date(y, mo, d)
+        if res:
+            return res
+
+    # 6. Keyword-bound Day Month (no year): 'Expires 31 Dec', 'Valid till 31st Oct'
+    m_dm = re.search(r"(?i)(?:expires?|expiry|exp|valid|till|through|until|upto|ends?|by|before)[\s\w:–\-,]*?\b(0?[1-9]|[12]\d|3[01])(?:st|nd|rd|th)?[\s\-_]+([a-zA-Z]{3,9})\b", text)
+    if m_dm:
+        mon_str = m_dm.group(2).lower()[:3]
+        mon = _MONTHS.get(mon_str)
+        if mon:
+            res = _clean_date(current_year, mon, m_dm.group(1))
+            if res:
+                d_obj = date.fromisoformat(res)
+                if d_obj < today - timedelta(days=7):
+                    res = _clean_date(current_year + 1, mon, m_dm.group(1))
+                return res
+
+    # 7. Keyword-bound Month Day (no year): 'Expires Dec 31', 'Valid till Oct 31st'
+    m_md = re.search(r"(?i)(?:expires?|expiry|exp|valid|till|through|until|upto|ends?|by|before)[\s\w:–\-,]*?\b([a-zA-Z]{3,9})\s+(0?[1-9]|[12]\d|3[01])(?:st|nd|rd|th)?\b", text)
+    if m_md:
+        mon_str = m_md.group(1).lower()[:3]
+        mon = _MONTHS.get(mon_str)
+        if mon:
+            res = _clean_date(current_year, mon, m_md.group(2))
+            if res:
+                d_obj = date.fromisoformat(res)
+                if d_obj < today - timedelta(days=7):
+                    res = _clean_date(current_year + 1, mon, m_md.group(2))
+                return res
+
     return None
 
 
@@ -390,6 +461,14 @@ def verify_multiple_coupon_screenshots(
 
     # Structured autofill fields parsed across all uploaded screenshots
     autofill = parse_coupon_fields(combined_text, detected_brand or claimed_brand)
+
+    # If expiry_date was missed in combined_text, check each screenshot individually
+    if not autofill.get("expiry_date"):
+        for t in extracted_texts:
+            exp = _parse_expiry(t)
+            if exp:
+                autofill["expiry_date"] = exp
+                break
 
     # Serialize previews: if 1 image, store data URL directly. If multiple, store as JSON array.
     serialized_proof = json.dumps(previews) if len(previews) > 1 else (previews[0] if previews else None)

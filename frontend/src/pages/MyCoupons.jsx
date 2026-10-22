@@ -1494,13 +1494,42 @@ export default function MyCoupons() {
           </div>
 
           <div className="col-12 col-md-4">
-            <label className="form-label fw-semibold small text-secondary">Expiry Date</label>
+            <div className="d-flex align-items-center justify-content-between mb-1">
+              <label className="form-label fw-semibold small text-secondary mb-0">Expiry Date</label>
+              <div className="d-flex gap-1">
+                {[
+                  { label: "+7D", days: 7 },
+                  { label: "+30D", days: 30 },
+                  { label: "+90D", days: 90 },
+                  { label: "+1Yr", days: 365 }
+                ].map(q => (
+                  <button
+                    key={q.label}
+                    type="button"
+                    className="btn btn-outline-secondary btn-sm py-0 px-1"
+                    style={{ fontSize: "10px" }}
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + q.days);
+                      setExpiryDate(d.toISOString().split("T")[0]);
+                    }}
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <input
               type="date"
               className="form-control"
               value={expiryDate}
               onChange={(e) => setExpiryDate(e.target.value)}
             />
+            {expiryDate && (
+              <span className="badge bg-success bg-opacity-10 text-success mt-1 small" style={{ fontSize: "11px" }}>
+                📅 Valid until {expiryDate}
+              </span>
+            )}
           </div>
 
           <div className="col-12 col-md-6">
@@ -1535,10 +1564,10 @@ export default function MyCoupons() {
               <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div>
                   <span className="fw-semibold small text-dark d-block">
-                    📸 Upload Reward Screenshot (Automated OCR Verification)
+                    📸 Upload Reward Screenshot(s) (Automated OCR Verification)
                   </span>
                   <span className="text-muted small" style={{ fontSize: "12px" }}>
-                    Upload your reward screenshot to prove authenticity. Our OCR AI verifies genuine reward codes & detects brands.
+                    Upload 1 or more screenshots to verify authenticity and extract offer terms, code, and expiry.
                   </span>
                 </div>
                 <div className="d-flex align-items-center gap-2">
@@ -1547,6 +1576,7 @@ export default function MyCoupons() {
                     id="ocrFileInput"
                     className="d-none"
                     accept="image/*"
+                    multiple
                     onChange={handleOcrUpload}
                   />
                   <label
