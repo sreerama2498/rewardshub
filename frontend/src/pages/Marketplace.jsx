@@ -4,6 +4,7 @@ import api from "../services/api";
 
 import Navbar from "../components/Navbar";
 import CouponLogo from "../components/CouponLogo";
+import CouponKnowledgeModal from "../components/CouponKnowledgeModal";
 
 import { toast } from "react-toastify";
 import { triggerSuperConfetti } from "../utils/confetti";
@@ -49,6 +50,7 @@ export default function Marketplace() {
   const [selectedBrand, setSelectedBrand] = useState("ALL");
   const [search, setSearch] = useState("");
   const [requestingId, setRequestingId] = useState(null);
+  const [showGuideModal, setShowGuideModal] = useState(false);
 
   const loadMarketplace = useCallback(async (cat = selectedCategory, disc = selectedDiscountType) => {
     try {
@@ -236,8 +238,15 @@ export default function Marketplace() {
               )}
             </div>
           </div>
-          <div className="col-12 col-md-6 text-md-end text-muted small">
-            Showing <strong>{filteredCoupons.length}</strong> of {coupons.length} offer(s)
+          <div className="col-12 col-md-6 d-flex align-items-center justify-content-md-end justify-content-between gap-3 text-muted small">
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm rounded-pill d-inline-flex align-items-center gap-1 px-3 shadow-sm"
+              onClick={() => setShowGuideModal(true)}
+            >
+              💡 Coupon & Category Guide
+            </button>
+            <span>Showing <strong>{filteredCoupons.length}</strong> of {coupons.length} offer(s)</span>
           </div>
         </div>
 
@@ -537,6 +546,12 @@ export default function Marketplace() {
         }
 
       </div>
+
+      {/* Coupon & Category Knowledge Guide Modal */}
+      <CouponKnowledgeModal
+        isOpen={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+      />
 
     </div>
 

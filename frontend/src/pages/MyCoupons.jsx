@@ -4,9 +4,15 @@ import api from "../services/api";
 import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/LoadingSpinner";
 import CouponLogo from "../components/CouponLogo";
+import CouponKnowledgeModal from "../components/CouponKnowledgeModal";
 
 import { toast } from "react-toastify";
 import { triggerConfetti } from "../utils/confetti";
+import {
+  detectCategoryFromBrand,
+  detectMechanismFromText,
+  COUPON_TYPES_GUIDE
+} from "../utils/couponTaxonomy";
 
 const MY_CATEGORIES = [
   { id: "FOOD", label: "Food & Dining", icon: "🍔" },
@@ -22,15 +28,15 @@ const MY_CATEGORIES = [
 ];
 
 const DISCOUNT_TYPES = [
-  { id: "FLAT_AMOUNT", label: "Fixed Amount-Off", icon: "💵", example: "Flat ₹150 OFF on cart" },
+  { id: "FLAT_AMOUNT", label: "Fixed Rupee Discount", icon: "💵", example: "Flat ₹150 OFF on cart" },
   { id: "PERCENTAGE", label: "Percentage-Off", icon: "🏷️", example: "30% OFF up to ₹150" },
   { id: "BOGO", label: "Buy-One-Get-One (BOGO)", icon: "🎁", example: "Buy 1 Get 1 Free on pizzas" },
   { id: "FREE_SHIPPING", label: "Free Shipping", icon: "🚚", example: "Free delivery on orders ₹299+" },
   { id: "FREE_GIFT", label: "Free Gift / Sample", icon: "✨", example: "Free trial kit with purchase" },
-  { id: "TIERED", label: "Tiered Threshold", icon: "📊", example: "Spend ₹1000 get ₹100, ₹2500 get ₹350" },
-  { id: "GIFT_CARD", label: "Prepaid Gift Card", icon: "💳", example: "Amazon / Flipkart ₹500 voucher with PIN" },
+  { id: "TIERED", label: "Spend More, Save More", icon: "📊", example: "Spend ₹1000 save ₹100, ₹2500 save ₹350" },
+  { id: "GIFT_CARD", label: "Prepaid Gift Card & PIN", icon: "💳", example: "Amazon / Flipkart ₹500 voucher with PIN" },
   { id: "CASHBACK", label: "Cashback Voucher", icon: "🪙", example: "₹50 cashback in wallet after transaction" },
-  { id: "SUBSCRIPTION_PASS", label: "Subscription Pass", icon: "⭐", example: "3 Months Spotify / OTT Premium Free" },
+  { id: "SUBSCRIPTION_PASS", label: "Subscription / OTT Pass", icon: "⭐", example: "3 Months Spotify / OTT Premium Free" },
   { id: "RECHARGE_BILL", label: "Recharge & Bill Pay", icon: "⚡", example: "Flat ₹25 OFF on mobile / electricity bill" }
 ];
 
@@ -103,6 +109,33 @@ export default function MyCoupons() {
   const [disputeReason, setDisputeReason] = useState("");
   const [showPin, setShowPin] = useState({});
   const [qrModalCoupon, setQrModalCoupon] = useState(null);
+
+  // Assisted UX Helpers
+  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  const [autoDetectedCat, setAutoDetectedCat] = useState(null);
+  const [autoDetectedType, setAutoDetectedType] = useState(null);
+
+  const handleSourceAppChange = (val) => {
+    setSourceApp(val);
+    const detected = detectCategoryFromBrand(val);
+    if (detected) {
+      setCategory(detected);
+      setAutoDetectedCat(detected);
+    } else {
+      setAutoDetectedCat(null);
+    }
+  };
+
+  const handleTitleChange = (val) => {
+    setTitle(val);
+    const detected = detectMechanismFromText(val);
+    if (detected) {
+      setAutoDetectedType(detected);
+    } else {
+      setAutoDetectedType(null);
+    }
+  };
 
   const togglePin = (couponId) => {
     setShowPin(prev => ({ ...prev, [couponId]: !prev[couponId] }));
@@ -595,8 +628,27 @@ export default function MyCoupons() {
               className="form-control"
               placeholder="e.g. Flat 50% Off / Amazon ₹500 Card / Swiggy BOGO"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => handleTitleChange(e.target.value)}
             />
+            {autoDetectedType && autoDetectedType !== discountType && (
+              <div className="mt-1 d-flex align-items-center gap-2">
+                <span className="badge bg-primary bg-opacity-10 text-primary small" style={{ fontSize: "11px" }}>
+                  ✨ Detected type: {DISCOUNT_TYPES.find(d => d.id === autoDetectedType)?.label}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link p-0 text-primary text-decoration-none fw-bold small"
+                  style={{ fontSize: "11px" }}
+                  onClick={() => {
+                    setDiscountType(autoDetectedType);
+                    setAutoDetectedType(null);
+                    toast.info(`Applied ${DISCOUNT_TYPES.find(d => d.id === autoDetectedType)?.label}`);
+                  }}
+                >
+                  Apply ➔
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="col-12 col-md-4">
@@ -605,8 +657,13 @@ export default function MyCoupons() {
               className="form-control"
               placeholder="e.g. Swiggy, Amazon, GooglePay, Myntra, Uber..."
               value={sourceApp}
-              onChange={(e) => setSourceApp(e.target.value)}
+              onChange={(e) => handleSourceAppChange(e.target.value)}
             />
+            {autoDetectedCat && (
+              <span className="badge bg-success bg-opacity-10 text-success d-inline-flex align-items-center gap-1 mt-1 small" style={{ fontSize: "11px" }}>
+                ✨ Auto-selected: {MY_CATEGORIES.find(c => c.id === autoDetectedCat)?.label}
+              </span>
+            )}
           </div>
 
           <div className="col-12 col-md-3">
@@ -614,7 +671,10 @@ export default function MyCoupons() {
             <select
               className="form-select"
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => {
+                setCategory(e.target.value);
+                setAutoDetectedCat(null);
+              }}
             >
               {MY_CATEGORIES.map(c => (
                 <option key={c.id} value={c.id}>
@@ -622,6 +682,9 @@ export default function MyCoupons() {
                 </option>
               ))}
             </select>
+            <small className="text-muted d-block mt-1" style={{ fontSize: "11px" }}>
+              e.g. Swiggy → Food, Myntra → Fashion, Blinkit → Grocery
+            </small>
           </div>
 
           <div className="col-12">
@@ -637,7 +700,7 @@ export default function MyCoupons() {
 
         {/* SECTION 2: Discount Mechanism (Dynamic Fields) */}
         <div className="p-3 mb-3 rounded-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
             <div>
               <span className="fw-bold text-dark d-block" style={{ fontSize: "14px" }}>
                 1. Select Discount Mechanism 🏷️
@@ -646,10 +709,78 @@ export default function MyCoupons() {
                 Fields below automatically adapt to your chosen coupon type
               </span>
             </div>
-            <span className="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill small">
-              Dynamic Form Engine
-            </span>
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                className="btn btn-outline-primary btn-sm rounded-pill d-inline-flex align-items-center gap-1 px-3 shadow-sm"
+                onClick={() => setShowGuideModal(true)}
+              >
+                💡 Coupon Guide
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm rounded-pill d-inline-flex align-items-center gap-1 px-3 shadow-sm ${
+                  showWizard ? "btn-warning fw-bold" : "btn-outline-warning text-dark bg-white"
+                }`}
+                onClick={() => setShowWizard(!showWizard)}
+              >
+                🪄 {showWizard ? "Hide Wizard" : "Help Me Choose"}
+              </button>
+              <span className="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill small">
+                Dynamic Form Engine
+              </span>
+            </div>
           </div>
+
+          {/* INTERACTIVE WIZARD: HELP ME CHOOSE */}
+          {showWizard && (
+            <div className="p-3 mb-3 rounded-3 border bg-white shadow-sm" style={{ borderColor: "#fde68a" }}>
+              <div className="d-flex align-items-center justify-content-between mb-2">
+                <span className="fw-bold text-dark small">
+                  🪄 Quick Helper: What does this coupon give you?
+                </span>
+                <button
+                  type="button"
+                  className="btn-close btn-sm"
+                  onClick={() => setShowWizard(false)}
+                />
+              </div>
+              <p className="text-muted small mb-2" style={{ fontSize: "12px" }}>
+                Click the scenario that best matches your voucher:
+              </p>
+              <div className="row g-2">
+                {[
+                  { id: "FLAT_AMOUNT", title: "💵 Direct Rupee Discount", desc: "Flat ₹100 or ₹200 off your cart total" },
+                  { id: "PERCENTAGE", title: "🏷️ Percentage Off", desc: "20% or 50% discount with a maximum cap" },
+                  { id: "BOGO", title: "🎁 Buy 1 Get 1 Free", desc: "Buy one item/pizza/ticket and get another free" },
+                  { id: "FREE_SHIPPING", title: "🚚 Free Delivery", desc: "Removes delivery or shipping charges completely" },
+                  { id: "GIFT_CARD", title: "💳 Prepaid Gift Card & PIN", desc: "Pre-loaded money with a voucher code and secret PIN" },
+                  { id: "SUBSCRIPTION_PASS", title: "⭐ Free Membership / Trial", desc: "3 months free Spotify, YouTube, or OTT access" },
+                  { id: "CASHBACK", title: "🪙 Post-Order Cashback", desc: "Money credited back to wallet/UPI after order" },
+                  { id: "RECHARGE_BILL", title: "⚡ Utility / Recharge Rebate", desc: "Discount on mobile recharge, FASTag, or electricity" }
+                ].map(wiz => (
+                  <div className="col-12 col-md-6 col-lg-3" key={wiz.id}>
+                    <button
+                      type="button"
+                      className={`btn w-100 text-start p-2 rounded-3 h-100 border ${
+                        discountType === wiz.id ? "border-primary bg-primary bg-opacity-10" : "bg-light hover-bg-white"
+                      }`}
+                      onClick={() => {
+                        setDiscountType(wiz.id);
+                        setShowWizard(false);
+                        toast.success(`Selected: ${wiz.title}`);
+                      }}
+                    >
+                      <strong className="d-block small text-dark">{wiz.title}</strong>
+                      <span className="text-muted d-block small" style={{ fontSize: "11px", lineHeight: "1.2" }}>
+                        {wiz.desc}
+                      </span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Discount Type Selector Buttons */}
           <div className="row g-2 mb-3">
@@ -681,6 +812,29 @@ export default function MyCoupons() {
               );
             })}
           </div>
+
+          {/* Active Discount Type Contextual Helper Bar */}
+          {(() => {
+            const activeGuide = COUPON_TYPES_GUIDE.find(g => g.id === discountType);
+            if (!activeGuide) return null;
+            return (
+              <div
+                className="p-2 px-3 mb-3 rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2"
+                style={{ background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: "12px" }}
+              >
+                <div className="d-flex align-items-center gap-2">
+                  <span className="fs-5">{activeGuide.icon}</span>
+                  <div>
+                    <strong className="text-primary">{activeGuide.friendlyName}:</strong>{" "}
+                    <span className="text-dark">{activeGuide.explanation}</span>
+                  </div>
+                </div>
+                <div className="text-muted small">
+                  <strong>Example:</strong> <span className="text-success fw-medium">{activeGuide.example}</span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* DYNAMIC FIELDS: PERCENTAGE */}
           {discountType === "PERCENTAGE" && (
@@ -1663,6 +1817,13 @@ export default function MyCoupons() {
           </div>
         </div>
       )}
+
+      {/* Coupon & Category Knowledge Guide Modal */}
+      <CouponKnowledgeModal
+        isOpen={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+        onSelectType={(tId) => setDiscountType(tId)}
+      />
 
     </div>
 
