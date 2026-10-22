@@ -26,6 +26,7 @@ class CouponCreate(BaseModel):
     usage_structure: str | None = "SINGLE_USE"
     expiry_date: date | None = None
     is_ocr_verified: bool = False
+    ocr_proof_url: str | None = None
 
     @model_validator(mode="after")
     def validate_code_or_url(self):

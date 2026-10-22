@@ -15,7 +15,7 @@ from app.models.platform_account import PlatformAccount
 from app.models.audit_log import AuditLog
 from app.schemas.coupon import CouponCreate, DisputeRequest
 from app.schemas.share import ShareCouponRequest
-from app.services.ocr import verify_coupon_screenshot
+from app.services.ocr import verify_multiple_coupon_screenshots, verify_coupon_screenshot
 from app.services.helpers import create_audit_log, create_notification
 
 router = APIRouter(tags=["Coupons & Sharing"])
@@ -23,19 +23,31 @@ router = APIRouter(tags=["Coupons & Sharing"])
 
 @router.post("/coupons/verify-ocr")
 async def verify_ocr(
-    file: UploadFile = File(...),
+    file: UploadFile = File(None),
+    files: list[UploadFile] = File(None),
     brand: str = Form(None),
     coupon_code: str = Form(None),
     current_user: User = Depends(get_current_user)
 ):
-    contents = await file.read()
-    if len(contents) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="Image file too large (max 10MB)")
+    upload_list = []
+    if files:
+        upload_list.extend(files)
+    if file:
+        upload_list.append(file)
+    if not upload_list:
+        raise HTTPException(status_code=400, detail="No screenshot image uploaded")
+
+    bytes_list = []
+    for f in upload_list:
+        contents = await f.read()
+        if len(contents) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Image file too large (max 10MB)")
+        bytes_list.append(contents)
 
     # Offload CPU-bound Tesseract OCR to threadpool so event loop is never blocked
     result = await asyncio.to_thread(
-        verify_coupon_screenshot,
-        image_bytes=contents,
+        verify_multiple_coupon_screenshots,
+        images_bytes_list=bytes_list,
         claimed_brand=brand,
         claimed_code=coupon_code
     )
@@ -72,6 +84,7 @@ def create_coupon(
         coupon_value=coupon.coupon_value,
         status="AVAILABLE",
         is_ocr_verified=bool(coupon.is_ocr_verified),
+        ocr_proof_url=coupon.ocr_proof_url,
         escrow_status="NONE",
         expiry_date=coupon.expiry_date,
         owner_id=current_user.id

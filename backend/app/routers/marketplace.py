@@ -85,6 +85,7 @@ def marketplace(
             "redemption_url": coupon.redemption_url,
             "has_redemption_url": bool(coupon.redemption_url),
             "is_ocr_verified": bool(coupon.is_ocr_verified),
+            "ocr_proof_url": coupon.ocr_proof_url,
             "status": coupon.status,
             "expiry_date": coupon.expiry_date
         })

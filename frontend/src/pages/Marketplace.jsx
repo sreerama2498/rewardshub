@@ -5,6 +5,7 @@ import api from "../services/api";
 import Navbar from "../components/Navbar";
 import CouponLogo from "../components/CouponLogo";
 import CouponKnowledgeModal from "../components/CouponKnowledgeModal";
+import CouponPhotoModal from "../components/CouponPhotoModal";
 
 import { toast } from "react-toastify";
 import { triggerSuperConfetti } from "../utils/confetti";
@@ -51,6 +52,8 @@ export default function Marketplace() {
   const [search, setSearch] = useState("");
   const [requestingId, setRequestingId] = useState(null);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [photoModalCoupon, setPhotoModalCoupon] = useState(null);
 
   const loadMarketplace = useCallback(async (cat = selectedCategory, disc = selectedDiscountType) => {
     try {
@@ -378,6 +381,19 @@ export default function Marketplace() {
                               🛡️ OCR Verified
                             </span>
                           )}
+                          {coupon.ocr_proof_url && (
+                            <button
+                              type="button"
+                              className="badge bg-primary bg-opacity-15 text-primary border border-primary border-opacity-25 px-2 py-1 rounded-pill small fw-bold text-decoration-none btn-link p-0"
+                              style={{ cursor: "pointer", fontSize: "10px" }}
+                              onClick={() => {
+                                setPhotoModalCoupon(coupon);
+                                setPhotoModalOpen(true);
+                              }}
+                            >
+                              📸 View Offer Photo
+                            </button>
+                          )}
                           {coupon.has_security_pin && (
                             <span className="badge bg-secondary bg-opacity-10 text-dark border border-secondary border-opacity-25 px-2 py-1 rounded-pill small" style={{ fontSize: "10px" }}>
                               🔐 Gift Card + PIN Included
@@ -551,6 +567,14 @@ export default function Marketplace() {
       <CouponKnowledgeModal
         isOpen={showGuideModal}
         onClose={() => setShowGuideModal(false)}
+      />
+
+      {/* Coupon Photo & Offer Details Lightbox Modal */}
+      <CouponPhotoModal
+        isOpen={photoModalOpen}
+        onClose={() => setPhotoModalOpen(false)}
+        photoData={photoModalCoupon?.ocr_proof_url}
+        coupon={photoModalCoupon}
       />
 
     </div>

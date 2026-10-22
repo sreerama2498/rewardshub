@@ -5,6 +5,7 @@ import Navbar from "../components/Navbar";
 import LoadingSpinner from "../components/LoadingSpinner";
 import CouponLogo from "../components/CouponLogo";
 import CouponKnowledgeModal from "../components/CouponKnowledgeModal";
+import CouponPhotoModal from "../components/CouponPhotoModal";
 
 import { toast } from "react-toastify";
 import { triggerConfetti } from "../utils/confetti";
@@ -103,8 +104,12 @@ export default function MyCoupons() {
   const [isOcrVerified, setIsOcrVerified] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrFeedback, setOcrFeedback] = useState(null);
-  const [ocrPreviewUrl, setOcrPreviewUrl] = useState(null);   // image preview URL
+  const [ocrPreviewUrls, setOcrPreviewUrls] = useState([]);   // array of screenshot URLs
+  const [ocrProofUrl, setOcrProofUrl] = useState(null);       // serialized proof for DB
   const [ocrAutofill, setOcrAutofill] = useState(null);       // parsed autofill fields
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [photoModalCoupon, setPhotoModalCoupon] = useState(null);
+  const [photoModalData, setPhotoModalData] = useState(null);
   const [disputeModalCoupon, setDisputeModalCoupon] = useState(null);
   const [disputeReason, setDisputeReason] = useState("");
   const [showPin, setShowPin] = useState({});
@@ -171,15 +176,15 @@ export default function MyCoupons() {
   }, []);
 
   const handleOcrUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFiles = Array.from(e.target.files || []);
+    if (rawFiles.length === 0) return;
 
-    // Show image preview immediately
-    const previewUrl = URL.createObjectURL(file);
-    setOcrPreviewUrl(previewUrl);
+    // Show image previews immediately
+    const localPreviews = rawFiles.map(f => URL.createObjectURL(f));
+    setOcrPreviewUrls(prev => [...prev, ...localPreviews]);
 
     const formData = new FormData();
-    formData.append("file", file);
+    rawFiles.forEach(f => formData.append("files", f));
     if (sourceApp) formData.append("brand", sourceApp);
     if (couponCode) formData.append("coupon_code", couponCode);
 
@@ -198,22 +203,31 @@ export default function MyCoupons() {
       const af = data.autofill || {};
       const isVerified = Boolean(data.is_verified || data.is_valid);
 
-      // Always store autofill suggestions so user can review them
+      if (data.ocr_proof_url) {
+        setOcrProofUrl(data.ocr_proof_url);
+      }
+      if (data.image_previews && data.image_previews.length > 0) {
+        setOcrPreviewUrls(data.image_previews);
+      }
+
+      // Always store autofill suggestions
       if (Object.keys(af).length > 0) {
         setOcrAutofill(af);
+        // Automatically populate form fields with extracted data!
+        applyAutofill(af, false);
       }
 
       if (isVerified) {
         setIsOcrVerified(true);
-        toast.success("✅ Screenshot verified! Review auto-filled fields below.");
+        toast.success(`✅ Scanned ${rawFiles.length} screenshot(s)! Fields automatically extracted.`);
       } else {
         setIsOcrVerified(false);
         const reason = !data.brand_matched
-          ? "Brand could not be identified."
+          ? "Brand could not be fully identified."
           : !data.code_matched
           ? "Coupon code not detected clearly."
           : "Could not fully verify screenshot.";
-        toast.warning(`⚠️ Partial scan: ${reason} Fields extracted where possible.`);
+        toast.warning(`⚠️ Partial scan: ${reason} Extracted available offer details.`);
       }
     } catch (err) {
       console.error(err);
@@ -224,12 +238,13 @@ export default function MyCoupons() {
   };
 
   // Apply autofill suggestions to form fields
-  const applyAutofill = (af) => {
+  const applyAutofill = (af, showNotification = true) => {
     if (!af) return;
     if (af.title)              setTitle(af.title);
     if (af.source_app)         setSourceApp(af.source_app);
     if (af.category)           setCategory(af.category);
     if (af.coupon_code)        setCouponCode(af.coupon_code);
+    if (af.security_pin)       setSecurityPin(af.security_pin);
     if (af.discount_type)      setDiscountType(af.discount_type);
     if (af.discount_percent)   setDiscountPercent(String(af.discount_percent));
     if (af.max_discount_cap)   setMaxDiscountCap(String(af.max_discount_cap));
@@ -238,8 +253,96 @@ export default function MyCoupons() {
     if (af.expiry_date)        setExpiryDate(af.expiry_date);
     if (af.bogo_details)       setBogoDetails(af.bogo_details);
     if (af.free_gift_details)  setFreeGiftDetails(af.free_gift_details);
-    toast.success("✨ Form auto-filled from screenshot! Review & adjust if needed.");
-    setOcrAutofill(null); // dismiss the autofill panel after applying
+    if (af.cashback_amount)    setCashbackAmount(String(af.cashback_amount));
+    if (af.subscription_period) setSubscriptionPeriod(af.subscription_period);
+    if (af.distribution_channel) setDistributionChannel(af.distribution_channel);
+    if (showNotification) {
+      toast.success("✨ Form auto-filled from screenshot! Review & adjust if needed.");
+    }
+  };
+
+  const publishDirectlyFromOcr = async () => {
+    const activeAf = ocrAutofill || {};
+    const finalSourceApp = sourceApp || activeAf.source_app;
+    const finalCode = couponCode || activeAf.coupon_code || redemptionUrl;
+    const finalTitle = title || activeAf.title || `${finalSourceApp || "Special"} Offer Voucher`;
+    const finalType = discountType || activeAf.discount_type || "FLAT_AMOUNT";
+
+    if (!finalSourceApp) {
+      toast.warning("Please specify the brand (e.g. Swiggy, Amazon) before publishing.");
+      return;
+    }
+    if (!finalCode) {
+      toast.warning("Please specify a coupon code or redemption link before publishing.");
+      return;
+    }
+
+    let finalValue = parseInt(couponValue || activeAf.coupon_value || 0, 10);
+    if (!finalValue || finalValue <= 0) {
+      if (finalType === "PERCENTAGE") finalValue = parseInt(maxDiscountCap || activeAf.max_discount_cap || 100, 10);
+      else if (finalType === "FREE_SHIPPING") finalValue = 50;
+      else if (finalType === "BOGO") finalValue = 250;
+      else if (finalType === "FREE_GIFT") finalValue = 299;
+      else if (finalType === "CASHBACK") finalValue = parseInt(cashbackAmount || activeAf.cashback_amount || 50, 10);
+      else if (finalType === "SUBSCRIPTION_PASS") finalValue = 299;
+      else finalValue = 100;
+    }
+
+    try {
+      await api.post("/coupons", {
+        title: finalTitle,
+        description: description || "Verified offer uploaded via screenshot",
+        source_app: finalSourceApp,
+        category: category || activeAf.category || "OTHER",
+        discount_type: finalType,
+        discount_percent: parseInt(discountPercent || activeAf.discount_percent || 0, 10),
+        max_discount_cap: parseInt(maxDiscountCap || activeAf.max_discount_cap || 0, 10),
+        min_order_value: parseInt(minOrderValue || activeAf.min_order_value || 0, 10),
+        bogo_details: bogoDetails || activeAf.bogo_details || null,
+        free_gift_details: freeGiftDetails || activeAf.free_gift_details || null,
+        cashback_amount: parseInt(cashbackAmount || activeAf.cashback_amount || 0, 10),
+        subscription_period: subscriptionPeriod || activeAf.subscription_period || null,
+        tier_details: tierDetails || activeAf.tier_details || null,
+        distribution_channel: distributionChannel || activeAf.distribution_channel || "DIGITAL",
+        target_audience: targetAudience || "ALL_USERS",
+        usage_structure: usageStructure || "SINGLE_USE",
+        coupon_code: finalCode,
+        security_pin: securityPin || activeAf.security_pin || null,
+        terms_note: termsNote || activeAf.terms_note || null,
+        redemption_url: redemptionUrl || null,
+        coupon_value: finalValue,
+        expiry_date: expiryDate || activeAf.expiry_date || null,
+        is_ocr_verified: true,
+        ocr_proof_url: ocrProofUrl || null
+      });
+
+      triggerConfetti();
+      toast.success("🎉 Coupon Created & Published to Marketplace with Verified Screenshot!");
+
+      // Reset
+      setTitle("");
+      setDescription("");
+      setSourceApp("");
+      setCategory("OTHER");
+      setDiscountType("FLAT_AMOUNT");
+      setDiscountPercent("");
+      setMaxDiscountCap("");
+      setMinOrderValue("");
+      setCouponCode("");
+      setSecurityPin("");
+      setCouponValue("");
+      setExpiryDate("");
+      setIsOcrVerified(false);
+      setOcrFeedback(null);
+      setOcrAutofill(null);
+      setOcrPreviewUrls([]);
+      setOcrProofUrl(null);
+
+      loadCoupons();
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.detail || "Failed to publish coupon to marketplace.");
+    }
   };
 
   const confirmRedeem = async (couponId) => {
@@ -313,7 +416,8 @@ export default function MyCoupons() {
           redemption_url: redemptionUrl || null,
           coupon_value: computedValue,
           expiry_date: expiryDate || null,
-          is_ocr_verified: isOcrVerified
+          is_ocr_verified: isOcrVerified,
+          ocr_proof_url: ocrProofUrl || null
         }
       );
 
@@ -345,6 +449,10 @@ export default function MyCoupons() {
       setCouponValue("");
       setExpiryDate("");
       setIsOcrVerified(false);
+      setOcrFeedback(null);
+      setOcrAutofill(null);
+      setOcrPreviewUrls([]);
+      setOcrProofUrl(null);
       setOcrFeedback(null);
 
       loadCoupons();
@@ -485,139 +593,232 @@ export default function MyCoupons() {
           )}
         </div>
 
-        {/* ─── Screenshot Scan Banner ───────────────────────────────────────── */}
+        {/* ─── Multi-Screenshot Scan Banner ──────────────────────────────────── */}
         <div
-          className="mb-4 p-3 rounded-3 d-flex flex-column flex-sm-row align-items-start align-items-sm-center gap-3"
-          style={{ background: "linear-gradient(135deg,#f0f7ff 0%,#eef2ff 100%)", border: "1px dashed #93c5fd" }}
+          className="mb-4 p-3 rounded-3 d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-3 shadow-sm"
+          style={{ background: "linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%)", border: "1px dashed #6366f1" }}
         >
           <div className="flex-grow-1">
-            <p className="fw-semibold mb-1" style={{ color: "#1e40af" }}>
-              📸 Scan Coupon Screenshot
-            </p>
-            <p className="text-muted small mb-0">
-              Upload a screenshot of any coupon/offer and we'll auto-fill the form for you.
+            <div className="d-flex align-items-center gap-2 mb-1">
+              <span className="fs-4">📸</span>
+              <p className="fw-bold mb-0" style={{ color: "#312e81" }}>
+                Auto-Scan Coupon Screenshots (Multi-Photo Supported)
+              </p>
+              <span className="badge bg-primary text-white rounded-pill px-2 py-1" style={{ fontSize: "10px" }}>
+                Multi-Image OCR
+              </span>
+            </div>
+            <p className="text-secondary small mb-0">
+              Upload 1 or more screenshots (offer banner, promo code, terms, expiry). We merge them and auto-fill all required fields.
             </p>
           </div>
 
           <label
-            className="btn btn-sm px-3 fw-semibold text-nowrap"
-            style={{ background: "#3b82f6", color: "#fff", borderRadius: "10px", cursor: "pointer" }}
+            className="btn btn-sm px-4 py-2 fw-semibold text-nowrap shadow-sm"
+            style={{ background: "#4f46e5", color: "#fff", borderRadius: "10px", cursor: "pointer" }}
           >
             {ocrLoading ? (
-              <><span className="spinner-border spinner-border-sm me-2" role="status" />&nbsp;Scanning…</>
+              <><span className="spinner-border spinner-border-sm me-2" role="status" />&nbsp;Scanning Photos…</>
             ) : (
-              <>📷 &nbsp;Upload Screenshot</>
+              <>📷 &nbsp;Upload Screenshot(s)</>
             )}
             <input
               type="file"
               accept="image/*"
+              multiple
               className="d-none"
               onChange={handleOcrUpload}
             />
           </label>
         </div>
 
-        {/* ─── Screenshot Preview + Autofill Panel ─────────────────────────── */}
-        {(ocrPreviewUrl || ocrAutofill) && (
+        {/* ─── Multi-Screenshot Preview & 1-Click Publishing Panel ───────────── */}
+        {(ocrPreviewUrls.length > 0 || ocrAutofill) && (
           <div
-            className="mb-4 p-3 rounded-3"
-            style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}
+            className="mb-4 p-4 rounded-3 shadow-sm"
+            style={{ background: "#ffffff", border: "1px solid #c7d2fe" }}
           >
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 pb-2 border-bottom">
+              <div>
+                <span className="fw-bold text-dark d-block">
+                  🖼️ Uploaded Coupon Photos ({ocrPreviewUrls.length})
+                </span>
+                <span className="text-muted small" style={{ fontSize: "12px" }}>
+                  Click any photo thumbnail to inspect the full image and extracted offer details
+                </span>
+              </div>
+              <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-danger"
+                  onClick={() => {
+                    setOcrPreviewUrls([]);
+                    setOcrProofUrl(null);
+                    setOcrAutofill(null);
+                  }}
+                >
+                  Clear Photos
+                </button>
+              </div>
+            </div>
+
             <div className="row g-3 align-items-start">
-              {ocrPreviewUrl && (
-                <div className="col-auto">
-                  <img
-                    src={ocrPreviewUrl}
-                    alt="Uploaded coupon screenshot"
-                    className="rounded-2 shadow-sm"
-                    style={{ maxHeight: "160px", maxWidth: "220px", objectFit: "contain", border: "1px solid #e2e8f0" }}
-                  />
+              {/* Photo Thumbnails */}
+              {ocrPreviewUrls.length > 0 && (
+                <div className="col-12 col-md-auto d-flex flex-wrap gap-2">
+                  {ocrPreviewUrls.map((url, idx) => (
+                    <div
+                      key={idx}
+                      className="position-relative rounded-3 overflow-hidden border shadow-sm transition-all"
+                      style={{
+                        cursor: "pointer",
+                        width: "120px",
+                        height: "120px",
+                        background: "#0f172a"
+                      }}
+                      onClick={() => {
+                        setPhotoModalData(ocrPreviewUrls);
+                        setPhotoModalCoupon({
+                          title: title || ocrAutofill?.title || "Scanned Coupon",
+                          source_app: sourceApp || ocrAutofill?.source_app,
+                          coupon_code: couponCode || ocrAutofill?.coupon_code,
+                          security_pin: securityPin || ocrAutofill?.security_pin,
+                          discount_type: discountType || ocrAutofill?.discount_type,
+                          coupon_value: couponValue || ocrAutofill?.coupon_value,
+                          expiry_date: expiryDate || ocrAutofill?.expiry_date,
+                          terms_note: termsNote || ocrAutofill?.terms_note
+                        });
+                        setPhotoModalOpen(true);
+                      }}
+                      title="Click to view full photo and offer details"
+                    >
+                      <img
+                        src={url}
+                        alt={`Screenshot ${idx + 1}`}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                      <span className="position-absolute top-0 start-0 badge bg-dark bg-opacity-75 m-1" style={{ fontSize: "10px" }}>
+                        #{idx + 1}
+                      </span>
+                      <div
+                        className="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-75 text-white py-1 text-center small"
+                        style={{ fontSize: "10px" }}
+                      >
+                        🔍 View Photo
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
+              {/* Detected Offer Details & 1-Click Publishing */}
               {ocrAutofill && (
                 <div className="col">
-                  <p className="fw-semibold mb-2" style={{ color: "#0f766e" }}>
-                    ✨ Detected Fields — Click "Apply" to fill the form
-                  </p>
-                  <div className="d-flex flex-wrap gap-2 mb-3">
-                    {ocrAutofill.title && (
-                      <span className="badge rounded-pill px-3 py-2" style={{ background: "#ecfdf5", color: "#065f46", fontSize: "12px" }}>
-                        📌 Title: {ocrAutofill.title}
+                  <div className="p-3 rounded-3 mb-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <span className="fw-bold small text-success">
+                        ✨ Extracted Offer Details (Ready to Publish)
                       </span>
-                    )}
-                    {ocrAutofill.source_app && (
-                      <span className="badge rounded-pill px-3 py-2" style={{ background: "#eff6ff", color: "#1e40af", fontSize: "12px" }}>
-                        🏷️ Brand: {ocrAutofill.source_app}
-                      </span>
-                    )}
-                    {ocrAutofill.coupon_code && (
-                      <span className="badge rounded-pill px-3 py-2" style={{ background: "#fef9c3", color: "#713f12", fontSize: "12px" }}>
-                        🎫 Code: {ocrAutofill.coupon_code}
-                      </span>
-                    )}
-                    {ocrAutofill.discount_type && (
-                      <span className="badge rounded-pill px-3 py-2" style={{ background: "#fdf4ff", color: "#6b21a8", fontSize: "12px" }}>
-                        💰 Type: {ocrAutofill.discount_type}
-                      </span>
-                    )}
-                    {ocrAutofill.discount_percent && (
-                      <span className="badge rounded-pill px-3 py-2" style={{ background: "#fff7ed", color: "#9a3412", fontSize: "12px" }}>
-                        % {ocrAutofill.discount_percent}% Off
-                      </span>
-                    )}
-                    {ocrAutofill.max_discount_cap && (
-                      <span className="badge rounded-pill px-3 py-2" style={{ background: "#ecfdf5", color: "#065f46", fontSize: "12px" }}>
-                        🔝 Max Cap: ₹{ocrAutofill.max_discount_cap}
-                      </span>
-                    )}
-                    {ocrAutofill.min_order_value && (
-                      <span className="badge rounded-pill px-3 py-2" style={{ background: "#f0fdf4", color: "#14532d", fontSize: "12px" }}>
-                        🛒 Min Order: ₹{ocrAutofill.min_order_value}
-                      </span>
-                    )}
-                    {ocrAutofill.expiry_date && (
-                      <span className="badge rounded-pill px-3 py-2" style={{ background: "#fff1f2", color: "#9f1239", fontSize: "12px" }}>
-                        📅 Expires: {ocrAutofill.expiry_date}
-                      </span>
-                    )}
-                    {ocrAutofill.category && (
-                      <span className="badge rounded-pill px-3 py-2" style={{ background: "#f5f3ff", color: "#4c1d95", fontSize: "12px" }}>
-                        📂 {ocrAutofill.category}
-                      </span>
-                    )}
-                  </div>
-                  <div className="d-flex gap-2">
-                    <button
-                      className="btn btn-sm fw-semibold px-4"
-                      style={{ background: "#0f766e", color: "#fff", borderRadius: "8px" }}
-                      onClick={() => applyAutofill(ocrAutofill)}
-                    >
-                      ✅ Apply Auto-Fill
-                    </button>
-                    <button
-                      className="btn btn-sm btn-outline-secondary fw-semibold px-3"
-                      style={{ borderRadius: "8px" }}
-                      onClick={() => { setOcrAutofill(null); setOcrPreviewUrl(null); }}
-                    >
-                      Dismiss
-                    </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-link p-0 text-decoration-none small"
+                        onClick={() => {
+                          setPhotoModalData(ocrPreviewUrls);
+                          setPhotoModalCoupon({
+                            title: title || ocrAutofill?.title || "Scanned Coupon",
+                            source_app: sourceApp || ocrAutofill?.source_app,
+                            coupon_code: couponCode || ocrAutofill?.coupon_code,
+                            security_pin: securityPin || ocrAutofill?.security_pin,
+                            discount_type: discountType || ocrAutofill?.discount_type,
+                            coupon_value: couponValue || ocrAutofill?.coupon_value,
+                            expiry_date: expiryDate || ocrAutofill?.expiry_date,
+                            terms_note: termsNote || ocrAutofill?.terms_note
+                          });
+                          setPhotoModalOpen(true);
+                        }}
+                      >
+                        🔍 Inspect In Photo Viewer
+                      </button>
+                    </div>
+
+                    <div className="d-flex flex-wrap gap-2 mb-3">
+                      {(title || ocrAutofill.title) && (
+                        <span className="badge rounded-pill px-3 py-2 bg-success bg-opacity-10 text-success" style={{ fontSize: "12px" }}>
+                          📌 Title: {title || ocrAutofill.title}
+                        </span>
+                      )}
+                      {(sourceApp || ocrAutofill.source_app) && (
+                        <span className="badge rounded-pill px-3 py-2 bg-primary bg-opacity-10 text-primary" style={{ fontSize: "12px" }}>
+                          🏷️ Brand: {sourceApp || ocrAutofill.source_app}
+                        </span>
+                      )}
+                      {(couponCode || ocrAutofill.coupon_code) && (
+                        <span className="badge rounded-pill px-3 py-2 bg-warning bg-opacity-25 text-dark fw-bold" style={{ fontSize: "12px" }}>
+                          🎫 Code: {couponCode || ocrAutofill.coupon_code}
+                        </span>
+                      )}
+                      {(securityPin || ocrAutofill.security_pin) && (
+                        <span className="badge rounded-pill px-3 py-2 bg-danger bg-opacity-10 text-danger fw-bold" style={{ fontSize: "12px" }}>
+                          🔐 PIN: {securityPin || ocrAutofill.security_pin}
+                        </span>
+                      )}
+                      {(discountType || ocrAutofill.discount_type) && (
+                        <span className="badge rounded-pill px-3 py-2 bg-info bg-opacity-10 text-dark" style={{ fontSize: "12px" }}>
+                          💰 Type: {discountType || ocrAutofill.discount_type}
+                        </span>
+                      )}
+                      {(couponValue || ocrAutofill.coupon_value) && (
+                        <span className="badge rounded-pill px-3 py-2 bg-success bg-opacity-10 text-success fw-bold" style={{ fontSize: "12px" }}>
+                          💵 Value: ₹{couponValue || ocrAutofill.coupon_value}
+                        </span>
+                      )}
+                      {(expiryDate || ocrAutofill.expiry_date) && (
+                        <span className="badge rounded-pill px-3 py-2 bg-danger bg-opacity-10 text-danger" style={{ fontSize: "12px" }}>
+                          📅 Expires: {expiryDate || ocrAutofill.expiry_date}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Direct 1-Click Publishing Button */}
+                    <div className="d-flex flex-wrap align-items-center gap-2 pt-2 border-top">
+                      <button
+                        type="button"
+                        className="btn btn-success fw-bold px-4 py-2 rounded-3 shadow-sm d-inline-flex align-items-center gap-2"
+                        onClick={publishDirectlyFromOcr}
+                      >
+                        <span>🚀</span>
+                        <span>Auto-Fill & Publish to Marketplace Now</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary fw-semibold px-3 py-2 rounded-3"
+                        onClick={() => {
+                          applyAutofill(ocrAutofill);
+                          const el = document.getElementById("coupon-form-anchor");
+                          if (el) el.scrollIntoView({ behavior: "smooth" });
+                        }}
+                      >
+                        ✏️ Review & Edit Form Below
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {!ocrAutofill && ocrPreviewUrl && !ocrLoading && (
+              {!ocrAutofill && ocrPreviewUrls.length > 0 && !ocrLoading && (
                 <div className="col d-flex align-items-center">
                   <p className="text-muted small mb-0">
                     {ocrFeedback?.is_verified
-                      ? "✅ Verified — no additional auto-fill data found."
-                      : "⚠️ Screenshot processed but few fields could be extracted. Try a clearer image."}
+                      ? "✅ Verified — click 'Publish to Marketplace' below to list your coupon."
+                      : "⚠️ Screenshots scanned. You can review and adjust any remaining fields below before publishing."}
                   </p>
                 </div>
               )}
             </div>
           </div>
         )}
+
+        <div id="coupon-form-anchor" />
 
         {/* SECTION 1: Basic Information */}
 
@@ -1522,6 +1723,20 @@ export default function MyCoupons() {
                               🛡️ OCR Verified
                             </span>
                           )}
+                          {coupon.ocr_proof_url && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1 border"
+                              style={{ fontSize: "10px", fontWeight: "600" }}
+                              onClick={() => {
+                                setPhotoModalCoupon(coupon);
+                                setPhotoModalData(coupon.ocr_proof_url);
+                                setPhotoModalOpen(true);
+                              }}
+                            >
+                              📸 View Voucher Photo
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -1823,6 +2038,14 @@ export default function MyCoupons() {
         isOpen={showGuideModal}
         onClose={() => setShowGuideModal(false)}
         onSelectType={(tId) => setDiscountType(tId)}
+      />
+
+      {/* Coupon Photo & Offer Details Lightbox Modal */}
+      <CouponPhotoModal
+        isOpen={photoModalOpen}
+        onClose={() => setPhotoModalOpen(false)}
+        photoData={photoModalData}
+        coupon={photoModalCoupon}
       />
 
     </div>

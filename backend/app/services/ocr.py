@@ -1,5 +1,7 @@
 import io
 import re
+import base64
+import json
 
 try:
     from PIL import Image, ImageFilter, ImageEnhance
@@ -181,29 +183,52 @@ def parse_coupon_fields(raw_text: str, detected_brand: str = None) -> dict:
     elif all_candidates:
         fields["coupon_code"] = all_candidates[0].upper()
 
-    # ---- 2. Discount mechanism -------------------------------------------
+    # ---- 2. Security PIN & Gift Card Detection ----------------------------
+    pin_match = re.search(r"(?i)(?:pin|secret\s*pin|cvv|card\s*pin|voucher\s*pin)[:\s]*([0-9]{4,8})", raw_text)
+    if pin_match:
+        fields["security_pin"] = pin_match.group(1).strip()
+        fields["distribution_channel"] = "GIFT_CARD"
+        fields["discount_type"] = "GIFT_CARD"
+
+    # ---- 3. Discount mechanism -------------------------------------------
     pct_match = re.search(r"(\d{1,2})\s*%\s*(?:off|discount|cashback)?", raw_text, re.IGNORECASE)
     bogo_match = re.search(r"(?i)buy\s*[12]\s*get\s*[12]|bogo", raw_text)
     ship_match = re.search(r"(?i)free\s*(delivery|shipping)", raw_text)
     gift_match = re.search(r"(?i)free\s*(gift|trial|sample|item|product)", raw_text)
     flat_match = re.search(r"(?i)(?:flat|get|save|earn)\s*(?:₹|rs\.?|inr)?\s*(\d+)\s*(?:off|cashback)?", raw_text)
+    cashback_match = re.search(r"(?i)(?:cashback|cash\s*back|wallet\s*credit)\s*(?:of|up\s*to)?\s*(?:₹|rs\.?|inr)?\s*(\d+)", raw_text)
+    sub_match = re.search(r"(?i)(\d+)\s*(?:months?|years?|days?)\s*(?:free|trial|subscription|premium)", raw_text)
+    bill_match = re.search(r"(?i)(?:recharge|electricity|bill|fastag|dth|broadband|utility)", raw_text)
 
-    if bogo_match:
-        fields["discount_type"] = "BOGO"
-        fields["bogo_details"] = bogo_match.group(0).strip()
-    elif ship_match:
-        fields["discount_type"] = "FREE_SHIPPING"
-    elif gift_match:
-        fields["discount_type"] = "FREE_GIFT"
-        fields["free_gift_details"] = gift_match.group(0).strip()
-    elif pct_match:
-        fields["discount_type"] = "PERCENTAGE"
-        fields["discount_percent"] = int(pct_match.group(1))
-    elif flat_match:
-        fields["discount_type"] = "FLAT_AMOUNT"
-        fields["coupon_value"] = int(flat_match.group(1))
+    if not fields.get("discount_type"):
+        if bogo_match:
+            fields["discount_type"] = "BOGO"
+            fields["bogo_details"] = bogo_match.group(0).strip()
+        elif ship_match:
+            fields["discount_type"] = "FREE_SHIPPING"
+        elif gift_match:
+            fields["discount_type"] = "FREE_GIFT"
+            fields["free_gift_details"] = gift_match.group(0).strip()
+        elif sub_match:
+            fields["discount_type"] = "SUBSCRIPTION_PASS"
+            fields["subscription_period"] = sub_match.group(0).strip()
+            fields["coupon_value"] = 299
+        elif bill_match and (pct_match or flat_match):
+            fields["discount_type"] = "RECHARGE_BILL"
+            if flat_match:
+                fields["coupon_value"] = int(flat_match.group(1))
+        elif cashback_match:
+            fields["discount_type"] = "CASHBACK"
+            fields["cashback_amount"] = int(cashback_match.group(1))
+            fields["coupon_value"] = int(cashback_match.group(1))
+        elif pct_match:
+            fields["discount_type"] = "PERCENTAGE"
+            fields["discount_percent"] = int(pct_match.group(1))
+        elif flat_match:
+            fields["discount_type"] = "FLAT_AMOUNT"
+            fields["coupon_value"] = int(flat_match.group(1))
 
-    # ---- 3. Max discount cap / face value --------------------------------
+    # ---- 4. Max discount cap / face value --------------------------------
     cap_match = re.search(
         r"(?i)(?:up\s*to|max(?:\s*discount)?|upto)\s*(?:₹|rs\.?|inr)?\s*(\d+)",
         raw_text,
@@ -213,7 +238,7 @@ def parse_coupon_fields(raw_text: str, detected_brand: str = None) -> dict:
         if not fields.get("coupon_value"):
             fields["coupon_value"] = int(cap_match.group(1))
 
-    # ---- 4. Min order / spend -------------------------------------------
+    # ---- 5. Min order / spend -------------------------------------------
     min_match = re.search(
         r"(?i)(?:min(?:imum)?\s*(?:order|spend|purchase|cart)|orders?\s*(?:above|of|over|worth))\s*(?:₹|rs\.?|inr)?\s*(\d+)",
         raw_text,
@@ -221,19 +246,19 @@ def parse_coupon_fields(raw_text: str, detected_brand: str = None) -> dict:
     if min_match:
         fields["min_order_value"] = int(min_match.group(1))
 
-    # ---- 5. Expiry date ---------------------------------------------------
+    # ---- 6. Expiry date ---------------------------------------------------
     expiry = _parse_expiry(raw_text)
     if expiry:
         fields["expiry_date"] = expiry
 
-    # ---- 6. Brand / source app ------------------------------------------
+    # ---- 7. Brand / source app ------------------------------------------
     if detected_brand:
         fields["source_app"] = detected_brand
 
-    # ---- 7. Category inference -------------------------------------------
+    # ---- 8. Category inference -------------------------------------------
     fields["category"] = _infer_category(raw_text, detected_brand)
 
-    # ---- 8. Auto-compose title ------------------------------------------
+    # ---- 9. Auto-compose title ------------------------------------------
     title_parts = []
     if detected_brand:
         title_parts.append(detected_brand)
@@ -249,6 +274,14 @@ def parse_coupon_fields(raw_text: str, detected_brand: str = None) -> dict:
         title_parts.append("Buy 1 Get 1 Free")
     elif fields.get("discount_type") == "FREE_GIFT":
         title_parts.append("Free Gift/Trial")
+    elif fields.get("discount_type") == "GIFT_CARD":
+        title_parts.append(f"Gift Card ₹{fields.get('coupon_value', 500)}")
+    elif fields.get("discount_type") == "CASHBACK":
+        title_parts.append(f"₹{fields.get('cashback_amount', fields.get('coupon_value', 100))} Cashback")
+    elif fields.get("discount_type") == "SUBSCRIPTION_PASS":
+        title_parts.append(f"{fields.get('subscription_period', 'Premium')} Pass")
+    elif fields.get("discount_type") == "RECHARGE_BILL":
+        title_parts.append(f"Recharge Rebate ₹{fields.get('coupon_value', 50)}")
 
     if fields.get("min_order_value"):
         title_parts.append(f"on ₹{fields['min_order_value']}+ orders")
@@ -259,25 +292,70 @@ def parse_coupon_fields(raw_text: str, detected_brand: str = None) -> dict:
     return fields
 
 
+def to_base64_preview(image_bytes: bytes) -> str:
+    """Generate lightweight web-ready base64 thumbnail for lightbox & proof storage."""
+    if not image_bytes or Image is None:
+        return ""
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        img.thumbnail((900, 900))
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=75, optimize=True)
+        encoded = base64.b64encode(buf.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{encoded}"
+    except Exception as e:
+        print(f"[OCR] Error generating base64 preview: {e}")
+        return ""
+
+
 # ---------------------------------------------------------------------------
-# Main public function – verify + auto-parse
+# Main public function – multi-screenshot verify + auto-parse
 # ---------------------------------------------------------------------------
 
-def verify_coupon_screenshot(
-    image_bytes: bytes,
+def verify_multiple_coupon_screenshots(
+    images_bytes_list: list[bytes],
     claimed_brand: str = None,
     claimed_code: str = None,
 ) -> dict:
-    raw_text = extract_text_from_image(image_bytes)
-    cleaned_ocr_text = clean_string(raw_text)
+    if not images_bytes_list:
+        return {
+            "is_verified": False,
+            "is_valid": False,
+            "brand_matched": False,
+            "code_matched": False,
+            "detected_brand": claimed_brand,
+            "detected_brands": [],
+            "detected_codes": [],
+            "confidence": 0.0,
+            "snippet": "",
+            "autofill": {},
+            "raw_text": "",
+            "image_previews": [],
+            "ocr_proof_url": None
+        }
+
+    extracted_texts = []
+    previews = []
+
+    for b in images_bytes_list:
+        txt = extract_text_from_image(b)
+        extracted_texts.append(txt)
+        preview_url = to_base64_preview(b)
+        if preview_url:
+            previews.append(preview_url)
+
+    combined_text = "\n\n--- SCREENSHOT SPLIT ---\n\n".join(extracted_texts)
+    cleaned_ocr_text = clean_string(combined_text)
 
     detected_brand = None
     brand_matched = False
     code_matched = False
 
-    # Detect known brand in OCR text
+    # Detect known brand across any of the screenshots
     for b in KNOWN_BRANDS:
-        if re.search(r"\b" + re.escape(b) + r"\b", raw_text, re.IGNORECASE) or clean_string(b) in cleaned_ocr_text:
+        if re.search(r"\b" + re.escape(b) + r"\b", combined_text, re.IGNORECASE) or clean_string(b) in cleaned_ocr_text:
             detected_brand = b
             break
 
@@ -290,7 +368,7 @@ def verify_coupon_screenshot(
     elif detected_brand:
         brand_matched = True
 
-    candidate_codes = extract_candidate_codes(raw_text)
+    candidate_codes = extract_candidate_codes(combined_text)
 
     if claimed_code:
         if len(clean_string(claimed_code)) >= 3 and clean_string(claimed_code) in cleaned_ocr_text:
@@ -303,16 +381,18 @@ def verify_coupon_screenshot(
         confidence += 45.0
     if code_matched:
         confidence += 50.0
-    if len(raw_text) > 20:
+    if len(combined_text) > 20:
         confidence += 5.0
 
     is_verified = brand_matched and code_matched
-
-    snippet = " ".join(raw_text.split()[:40])
+    snippet = " ".join(combined_text.split()[:40])
     detected_brands = [detected_brand] if detected_brand else ([claimed_brand] if claimed_brand else [])
 
-    # Structured autofill fields
-    autofill = parse_coupon_fields(raw_text, detected_brand or claimed_brand)
+    # Structured autofill fields parsed across all uploaded screenshots
+    autofill = parse_coupon_fields(combined_text, detected_brand or claimed_brand)
+
+    # Serialize previews: if 1 image, store data URL directly. If multiple, store as JSON array.
+    serialized_proof = json.dumps(previews) if len(previews) > 1 else (previews[0] if previews else None)
 
     return {
         "is_verified": is_verified,
@@ -324,6 +404,21 @@ def verify_coupon_screenshot(
         "detected_codes": candidate_codes,
         "confidence": min(confidence, 100.0),
         "snippet": snippet,
-        "autofill": autofill,           # ← NEW: structured field suggestions
-        "raw_text": raw_text[:500],     # ← NEW: first 500 chars for debug panel
+        "autofill": autofill,
+        "raw_text": combined_text[:1000],
+        "image_previews": previews,
+        "ocr_proof_url": serialized_proof
     }
+
+
+def verify_coupon_screenshot(
+    image_bytes: bytes,
+    claimed_brand: str = None,
+    claimed_code: str = None,
+) -> dict:
+    """Backward-compatible single screenshot verifier."""
+    return verify_multiple_coupon_screenshots(
+        images_bytes_list=[image_bytes],
+        claimed_brand=claimed_brand,
+        claimed_code=claimed_code
+    )
