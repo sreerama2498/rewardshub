@@ -1274,6 +1274,14 @@ export default function MyCoupons() {
                             rel="noopener noreferrer"
                             className="btn btn-outline-primary btn-sm w-100 d-flex align-items-center justify-content-center gap-2 py-2 fw-semibold"
                             style={{ borderRadius: "8px" }}
+                            onClick={() => {
+                              if (coupon.coupon_code && coupon.coupon_code !== "REDEEM_VIA_LINK") {
+                                if (navigator?.clipboard?.writeText) {
+                                  navigator.clipboard.writeText(coupon.coupon_code);
+                                }
+                                toast.success(`Copied code "${coupon.coupon_code}" and opening store!`);
+                              }
+                            }}
                           >
                             <span>🌐 Open & Redeem on {coupon.source_app || "Website"}</span>
                             <span style={{ fontSize: "13px" }}>↗</span>

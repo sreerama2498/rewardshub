@@ -46,6 +46,10 @@ def marketplace(
         total_price = round(val * 0.25, 2)
         owner_payout = round(val * 0.20, 2)
         platform_fee = round(val * 0.05, 2)
+        net_savings = round(max(0.0, val - total_price), 2)
+        savings_percentage = round((net_savings / val * 100), 0) if val > 0 else 0
+        days_left = (coupon.expiry_date - today).days if coupon.expiry_date else None
+        is_ending_soon = bool(days_left is not None and 0 <= days_left <= 2)
 
         marketplace_items.append({
             "id": coupon.id,
@@ -69,6 +73,10 @@ def marketplace(
             "total_price": total_price,
             "owner_payout": owner_payout,
             "platform_fee": platform_fee,
+            "net_savings": net_savings,
+            "savings_percentage": savings_percentage,
+            "days_left": days_left,
+            "is_ending_soon": is_ending_soon,
             "owner_id": coupon.owner_id,
             "is_owner": coupon.owner_id == current_user.id,
             "redemption_url": coupon.redemption_url,

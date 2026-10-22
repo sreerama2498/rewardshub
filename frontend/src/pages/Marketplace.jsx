@@ -29,6 +29,8 @@ const MARKET_DISCOUNT_TYPES = [
   { id: "TIERED", label: "Tiered Threshold", icon: "📊" }
 ];
 
+const POPULAR_BRANDS = ["ALL", "Swiggy", "Zomato", "Myntra", "Amazon", "Flipkart", "Ajio", "Domino's", "Uber"];
+
 export default function Marketplace() {
 
   const [coupons, setCoupons] = useState([]);
@@ -37,6 +39,7 @@ export default function Marketplace() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [selectedDiscountType, setSelectedDiscountType] = useState("ALL");
+  const [selectedBrand, setSelectedBrand] = useState("ALL");
   const [search, setSearch] = useState("");
   const [requestingId, setRequestingId] = useState(null);
 
@@ -85,6 +88,16 @@ export default function Marketplace() {
       setRequestingId(null);
     }
   };
+
+  const filteredCoupons = coupons.filter(c => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || (c.title || "").toLowerCase().includes(q) || (c.source_app || "").toLowerCase().includes(q) || (c.terms_note || "").toLowerCase().includes(q);
+    const matchBrand = selectedBrand === "ALL" || (c.title || "").toLowerCase().includes(selectedBrand.toLowerCase()) || (c.source_app || "").toLowerCase().includes(selectedBrand.toLowerCase());
+    return matchSearch && matchBrand;
+  });
+
+  const totalFaceValue = coupons.reduce((sum, c) => sum + (c.coupon_value || 0), 0);
+  const totalPotentialSavings = coupons.reduce((sum, c) => sum + (c.net_savings || Math.round((c.coupon_value || 0) * 0.75)), 0);
 
   if (loading) {
     return (
@@ -173,6 +186,31 @@ export default function Marketplace() {
         </div>
       )}
 
+      {/* Live Community Value Counter */}
+      <div className="row g-3 mb-4">
+        <div className="col-12 col-md-4">
+          <div className="card border-0 shadow-sm p-3 h-100" style={{ borderRadius: "14px", background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)", border: "1px solid #bbf7d0" }}>
+            <span className="text-success small fw-semibold">💸 Community Savings Available</span>
+            <h4 className="fw-bold text-success mb-0">₹{totalPotentialSavings.toLocaleString()}</h4>
+            <span className="text-muted" style={{ fontSize: "11px" }}>Save 75% instantly on verified coupons</span>
+          </div>
+        </div>
+        <div className="col-12 col-md-4">
+          <div className="card border-0 shadow-sm p-3 h-100" style={{ borderRadius: "14px", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", border: "1px solid #e2e8f0" }}>
+            <span className="text-secondary small fw-semibold">🏷️ Live Traded Face Value</span>
+            <h4 className="fw-bold text-dark mb-0">₹{totalFaceValue.toLocaleString()}</h4>
+            <span className="text-muted" style={{ fontSize: "11px" }}>Across {coupons.length} active scratch cards</span>
+          </div>
+        </div>
+        <div className="col-12 col-md-4">
+          <div className="card border-0 shadow-sm p-3 h-100" style={{ borderRadius: "14px", background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)", border: "1px solid #bfdbfe" }}>
+            <span className="text-primary small fw-semibold">🛡️ Zero-Risk Escrow Guarantee</span>
+            <h4 className="fw-bold text-primary mb-0">100% Protected</h4>
+            <span className="text-muted" style={{ fontSize: "11px" }}>Test the code before owner payout is released</span>
+          </div>
+        </div>
+      </div>
+
       {/* Category Pills & Search Toolbar */}
       <div className="card p-3 mb-4 border-0 shadow-sm" style={{ borderRadius: "16px", background: "#ffffff", border: "1px solid #e2e8f0" }}>
         <div className="row g-2 align-items-center mb-3">
@@ -191,11 +229,31 @@ export default function Marketplace() {
             </div>
           </div>
           <div className="col-12 col-md-6 text-md-end text-muted small">
-            Showing <strong>{coupons.filter(c => {
-              const q = search.toLowerCase();
-              return !q || (c.title || "").toLowerCase().includes(q) || (c.source_app || "").toLowerCase().includes(q) || (c.terms_note || "").toLowerCase().includes(q);
-            }).length}</strong> offer(s)
+            Showing <strong>{filteredCoupons.length}</strong> of {coupons.length} offer(s)
           </div>
+        </div>
+
+        {/* Popular Brand Quick Filter Chips */}
+        <div className="d-flex align-items-center gap-2 overflow-auto pb-2 border-bottom mb-2" style={{ whiteSpace: "nowrap" }}>
+          <span className="text-muted small fw-semibold me-1">Top Brands:</span>
+          {POPULAR_BRANDS.map((brand) => {
+            const isActive = selectedBrand === brand;
+            return (
+              <button
+                key={brand}
+                type="button"
+                onClick={() => setSelectedBrand(brand)}
+                className={`btn btn-sm rounded-pill px-3 py-1 transition-all ${
+                  isActive
+                    ? "btn-success shadow-sm fw-bold text-white"
+                    : "btn-outline-secondary border-0 bg-light text-dark"
+                }`}
+                style={{ fontSize: "12px" }}
+              >
+                {brand === "ALL" ? "✨ All Brands" : brand}
+              </button>
+            );
+          })}
         </div>
 
         {/* Scrollable Category Chips */}
@@ -248,12 +306,7 @@ export default function Marketplace() {
       <div className="row g-3">
 
         {
-          coupons
-            .filter(c => {
-              const q = search.toLowerCase();
-              return !q || (c.title || "").toLowerCase().includes(q) || (c.source_app || "").toLowerCase().includes(q) || (c.terms_note || "").toLowerCase().includes(q);
-            })
-            .length === 0 && (
+          filteredCoupons.length === 0 && (
             <div className="col-12">
               <div className="card text-center p-5 border-dashed">
                 <div style={{ fontSize: "40px" }} className="mb-2">🛒</div>
@@ -265,12 +318,7 @@ export default function Marketplace() {
         }
 
         {
-          coupons
-            .filter(c => {
-              const q = search.toLowerCase();
-              return !q || (c.title || "").toLowerCase().includes(q) || (c.source_app || "").toLowerCase().includes(q) || (c.terms_note || "").toLowerCase().includes(q);
-            })
-            .map((coupon) => {
+          filteredCoupons.map((coupon) => {
             const val = coupon.coupon_value || 0;
             const totalPrice = coupon.total_price ?? Math.round(val * 0.25);
             const ownerPayout = coupon.owner_payout ?? Math.round(val * 0.20);
@@ -293,6 +341,11 @@ export default function Marketplace() {
                           <span className="badge-soft badge-soft-primary">
                             {coupon.source_app}
                           </span>
+                          {coupon.is_ending_soon && (
+                            <span className="badge bg-danger text-white border-0 px-2 py-1 rounded-pill small fw-bold" style={{ fontSize: "10px" }}>
+                              ⚡ Expiring {coupon.days_left === 0 ? "Today" : `in ${coupon.days_left}d`}!
+                            </span>
+                          )}
                           {coupon.category && coupon.category !== "OTHER" && (
                             <span className="badge bg-light text-dark border px-2 py-1 rounded-pill small" style={{ fontSize: "10px" }}>
                               {CATEGORIES.find(c => c.id === coupon.category)?.icon || "🏷️"} {CATEGORIES.find(c => c.id === coupon.category)?.label || coupon.category}
@@ -382,7 +435,7 @@ export default function Marketplace() {
                       )}
 
                       {/* Face Value & Total to Pay */}
-                      <div className="coupon-ticket-notch mb-3 d-flex align-items-center justify-content-between">
+                      <div className="coupon-ticket-notch mb-2 d-flex align-items-center justify-content-between">
                         <div>
                           <span className="text-muted small d-block" style={{ fontSize: "11px", textTransform: "uppercase" }}>Coupon Value</span>
                           <span className="fw-bold text-dark fs-5">₹{val}</span>
@@ -391,6 +444,16 @@ export default function Marketplace() {
                           <span className="text-muted small d-block" style={{ fontSize: "11px", textTransform: "uppercase" }}>You Pay (25%)</span>
                           <span className="fw-bold text-warning fs-5">₹{totalPrice}</span>
                         </div>
+                      </div>
+
+                      {/* Net Community Savings Pill */}
+                      <div className="d-flex align-items-center justify-content-between p-2 mb-3 rounded-2" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                        <span className="small text-success fw-bold" style={{ fontSize: "12px" }}>
+                          💰 Net Savings: Save ₹{coupon.net_savings ?? Math.max(0, val - totalPrice)} ({coupon.savings_percentage ?? 75}% OFF)
+                        </span>
+                        <span className="badge bg-success bg-opacity-10 text-success fw-bold" style={{ fontSize: "10px" }}>
+                          Instant ROI
+                        </span>
                       </div>
 
                       {/* Transparent 20% / 5% Breakdown Pill */}
