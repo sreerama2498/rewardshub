@@ -738,3 +738,115 @@ def get_stats(
         "accepted_shares": accepted_shares
     }
 
+
+@router.get("/stats/{stat_type}")
+def get_stats_drilldown(
+    stat_type: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    is_admin = getattr(current_user, "role", "USER") == "ADMIN"
+
+    def mask_email(email_str: str) -> str:
+        if not email_str or "@" not in email_str:
+            return "Member"
+        parts = email_str.split("@")
+        name = parts[0]
+        domain = parts[1]
+        masked = name[0] + "***" if len(name) > 1 else name + "***"
+        return f"{masked}@{domain}"
+
+    if stat_type == "users":
+        users = db.query(User).filter(User.is_active == True).order_by(User.id.asc()).limit(100).all()
+        return [
+            {
+                "User ID": u.id,
+                "Name": u.name or "User",
+                "Email": u.email if (is_admin or u.id == current_user.id) else mask_email(u.email),
+                "Role": u.role or "USER",
+                "Joined On": u.created_at.strftime("%Y-%m-%d") if u.created_at else "N/A"
+            }
+            for u in users
+        ]
+
+    elif stat_type == "coupons":
+        coupons = db.query(Coupon).order_by(Coupon.id.desc()).limit(100).all()
+        return [
+            {
+                "ID": c.id,
+                "Brand": c.source_app or "General",
+                "Title": c.title,
+                "Discount Type": c.discount_type or "FLAT_AMOUNT",
+                "Category": c.category or "OTHER",
+                "Value": f"₹{c.coupon_value}" if c.coupon_value else "Free",
+                "Status": c.status or "ACTIVE",
+                "Expiry": c.expiry_date.strftime("%Y-%m-%d") if c.expiry_date else "No Expiry"
+            }
+            for c in coupons
+        ]
+
+    elif stat_type == "shares":
+        shares = db.query(CouponShare).order_by(CouponShare.id.desc()).limit(100).all()
+        if not shares:
+            return []
+
+        coupon_ids = {s.coupon_id for s in shares if s.coupon_id}
+        user_ids = {s.sender_id for s in shares if s.sender_id} | {s.receiver_id for s in shares if s.receiver_id}
+
+        coupons_map = {c.id: c for c in db.query(Coupon).filter(Coupon.id.in_(coupon_ids)).all()} if coupon_ids else {}
+        users_map = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+
+        results = []
+        for s in shares:
+            coupon = coupons_map.get(s.coupon_id)
+            sender = users_map.get(s.sender_id)
+            receiver = users_map.get(s.receiver_id)
+
+            sender_display = sender.email if (sender and (is_admin or s.sender_id == current_user.id)) else (mask_email(sender.email) if sender else f"User #{s.sender_id}")
+            receiver_display = receiver.email if (receiver and (is_admin or s.receiver_id == current_user.id)) else (mask_email(receiver.email) if receiver else f"User #{s.receiver_id}")
+
+            results.append({
+                "Share ID": s.id,
+                "Brand": coupon.source_app if coupon else "N/A",
+                "Coupon": coupon.title if coupon else f"Coupon #{s.coupon_id}",
+                "Sender": sender_display,
+                "Shared With": receiver_display,
+                "Status": s.status or "PENDING",
+                "Date Shared": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else "N/A"
+            })
+        return results
+
+    elif stat_type == "accepted":
+        shares = db.query(CouponShare).filter(CouponShare.status == "ACCEPTED").order_by(CouponShare.id.desc()).limit(100).all()
+        if not shares:
+            return []
+
+        coupon_ids = {s.coupon_id for s in shares if s.coupon_id}
+        user_ids = {s.sender_id for s in shares if s.sender_id} | {s.receiver_id for s in shares if s.receiver_id}
+
+        coupons_map = {c.id: c for c in db.query(Coupon).filter(Coupon.id.in_(coupon_ids)).all()} if coupon_ids else {}
+        users_map = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+
+        results = []
+        for s in shares:
+            coupon = coupons_map.get(s.coupon_id)
+            sender = users_map.get(s.sender_id)
+            receiver = users_map.get(s.receiver_id)
+
+            sender_display = sender.email if (sender and (is_admin or s.sender_id == current_user.id)) else (mask_email(sender.email) if sender else f"User #{s.sender_id}")
+            receiver_display = receiver.email if (receiver and (is_admin or s.receiver_id == current_user.id)) else (mask_email(receiver.email) if receiver else f"User #{s.receiver_id}")
+
+            results.append({
+                "Share ID": s.id,
+                "Brand": coupon.source_app if coupon else "N/A",
+                "Coupon": coupon.title if coupon else f"Coupon #{s.coupon_id}",
+                "Sender": sender_display,
+                "Accepted By": receiver_display,
+                "Status": "ACCEPTED",
+                "Date Accepted": s.created_at.strftime("%Y-%m-%d %H:%M") if s.created_at else "N/A"
+            })
+        return results
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid stats drilldown type: {stat_type}")
+

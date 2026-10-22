@@ -535,70 +535,83 @@ export default function Dashboard() {
         show={showModal}
         onHide={() => setShowModal(false)}
         size="lg"
+        centered
       >
-
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {modalTitle}
-          </Modal.Title>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <div className="d-flex align-items-center gap-2">
+            <Modal.Title className="fw-bold fs-5">
+              {modalTitle}
+            </Modal.Title>
+            {!modalLoading && modalData.length > 0 && (
+              <span className="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill small">
+                {modalData.length} record(s)
+              </span>
+            )}
+          </div>
         </Modal.Header>
 
-        <Modal.Body>
-
-          {
-            modalLoading ? (
-
-              <p>Loading...</p>
-
-            ) : modalData.length === 0 ? (
-
-              <p>No records found.</p>
-
-            ) : (
-
-              <div className="table-responsive">
-
-                <table
-                  className="table table-bordered table-striped"
-                >
-
-                  <thead className="table-dark">
-                    <tr>
-                      {
-                        Object.keys(modalData[0]).map(key => (
-                          <th key={key}>{key}</th>
-                        ))
-                      }
+        <Modal.Body className="p-4">
+          {modalLoading ? (
+            <div className="text-center py-5">
+              <div className="spinner-border text-primary" role="status"></div>
+              <p className="mt-3 text-muted small mb-0">Retrieving platform records...</p>
+            </div>
+          ) : modalData.length === 0 ? (
+            <div className="text-center py-5">
+              <span className="fs-1 d-block mb-2">📭</span>
+              <h6 className="fw-semibold text-dark">No records found</h6>
+              <p className="text-muted small mb-0">There are currently no records for this metric.</p>
+            </div>
+          ) : (
+            <div className="table-responsive rounded-3 border" style={{ maxHeight: "55vh" }}>
+              <table className="table table-hover align-middle mb-0" style={{ fontSize: "13px" }}>
+                <thead className="table-light sticky-top">
+                  <tr>
+                    {Object.keys(modalData[0]).map(key => (
+                      <th key={key} className="text-secondary fw-semibold py-3 px-3">
+                        {key}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {modalData.map((row, index) => (
+                    <tr key={index}>
+                      {Object.entries(row).map(([k, value], idx) => {
+                        const valStr = String(value ?? "");
+                        const isStatus = k.toLowerCase().includes("status");
+                        return (
+                          <td key={idx} className="py-3 px-3">
+                            {isStatus && valStr === "ACCEPTED" ? (
+                              <span className="badge bg-success bg-opacity-10 text-success fw-bold px-2 py-1 rounded-pill">
+                                ✅ {valStr}
+                              </span>
+                            ) : isStatus && valStr === "ACTIVE" ? (
+                              <span className="badge bg-primary bg-opacity-10 text-primary fw-bold px-2 py-1 rounded-pill">
+                                🟢 {valStr}
+                              </span>
+                            ) : isStatus && valStr === "PENDING" ? (
+                              <span className="badge bg-warning bg-opacity-10 text-warning text-dark fw-bold px-2 py-1 rounded-pill">
+                                ⏳ {valStr}
+                              </span>
+                            ) : (
+                              valStr
+                            )}
+                          </td>
+                        );
+                      })}
                     </tr>
-                  </thead>
-
-                  <tbody>
-                    {
-                      modalData.map((row, index) => (
-                        <tr key={index}>
-                          {
-                            Object.values(row).map(
-                              (value, idx) => (
-                                <td key={idx}>
-                                  {String(value ?? "")}
-                                </td>
-                              )
-                            )
-                          }
-                        </tr>
-                      ))
-                    }
-                  </tbody>
-
-                </table>
-
-              </div>
-
-            )
-          }
-
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Modal.Body>
-
+        <Modal.Footer className="border-0 pt-0">
+          <button className="btn btn-secondary btn-sm px-4 rounded-3" onClick={() => setShowModal(false)}>
+            Close
+          </button>
+        </Modal.Footer>
       </Modal>
 
     </div>
