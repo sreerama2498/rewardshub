@@ -138,10 +138,17 @@ def delete_user(
         f"Admin deleted user {user.email} (ID: {user.id})"
     )
 
-    # Detach audit logs rather than destroying audit trail
-    db.query(AuditLog).filter(AuditLog.user_id == user_id).update({"user_id": None})
-    db.delete(user)
-    db.commit()
+    try:
+        # Detach audit logs rather than destroying audit trail
+        db.query(AuditLog).filter(AuditLog.user_id == user_id).update({"user_id": None})
+        db.delete(user)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete user due to existing related records (coupons, transactions). Please disable the user instead."
+        )
 
     return {
         "message": "User deleted successfully"

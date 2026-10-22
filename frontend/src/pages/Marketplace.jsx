@@ -38,6 +38,7 @@ export default function Marketplace() {
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [selectedDiscountType, setSelectedDiscountType] = useState("ALL");
   const [search, setSearch] = useState("");
+  const [requestingId, setRequestingId] = useState(null);
 
   const loadMarketplace = useCallback(async (cat = selectedCategory, disc = selectedDiscountType) => {
     try {
@@ -68,6 +69,7 @@ export default function Marketplace() {
   }, [loadMarketplace]);
 
   const requestCoupon = async (couponId) => {
+    setRequestingId(couponId);
     try {
       const response = await api.post(`/request-coupon/${couponId}`, {});
 
@@ -79,6 +81,8 @@ export default function Marketplace() {
       toast.error(
         error?.response?.data?.detail || "Request Failed"
       );
+    } finally {
+      setRequestingId(null);
     }
   };
 
@@ -422,9 +426,10 @@ export default function Marketplace() {
                       ) : (
                         <button
                           className="btn btn-primary w-100 py-2"
+                          disabled={requestingId === coupon.id}
                           onClick={() => requestCoupon(coupon.id)}
                         >
-                          Request & Pay ₹{totalPrice}
+                          {requestingId === coupon.id ? "Processing Escrow..." : `Request & Pay ₹${totalPrice}`}
                         </button>
                       )}
                     </div>

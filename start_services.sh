@@ -4,8 +4,9 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
-# Kill any existing stale process on port 8001
+# Kill any existing stale process on port 8001 and 5173
 fuser -k 8001/tcp 2>/dev/null || true
+fuser -k 5173/tcp 2>/dev/null || true
 
 echo "Starting backend watchdog..."
 nohup bash -c '
@@ -32,7 +33,7 @@ done
 if ! curl -sf http://localhost:5173/ > /dev/null 2>&1; then
   echo "Starting frontend dev server..."
   cd "$DIR/frontend"
-  nohup npm run dev -- --host 0.0.0.0 --port 5173 > ../frontend.log 2>&1 &
+  nohup npx vite --host 0.0.0.0 --port 5173 > ../frontend.log 2>&1 &
   cd "$DIR"
 fi
 

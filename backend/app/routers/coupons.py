@@ -12,6 +12,7 @@ from app.models.coupon import Coupon
 from app.models.share import CouponShare
 from app.models.transaction import Transaction
 from app.models.platform_account import PlatformAccount
+from app.models.audit_log import AuditLog
 from app.schemas.coupon import CouponCreate, DisputeRequest
 from app.schemas.share import ShareCouponRequest
 from app.services.ocr import verify_coupon_screenshot
@@ -382,6 +383,7 @@ def share_coupon(
         status="PENDING"
     )
 
+    coupon.is_shared = True
     db.add(share)
     db.flush()
 
@@ -677,6 +679,24 @@ def get_activity(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Retrieve user's personal audit activity first
+    logs = (
+        db.query(AuditLog)
+        .filter(AuditLog.user_id == current_user.id)
+        .order_by(AuditLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    if logs:
+        return [
+            {
+                "type": log.action.replace("_", " ").title(),
+                "title": log.details or log.action,
+                "created_at": log.created_at
+            }
+            for log in logs
+        ]
+
     coupons = (
         db.query(Coupon)
         .order_by(Coupon.created_at.desc())

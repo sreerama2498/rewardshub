@@ -1,25 +1,41 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import api from "../services/api";
+import { toast } from "react-toastify";
 
 export default function Users() {
   const [users, setUsers] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadUsers = async () => {
+    const loadData = async () => {
       try {
-        const response = await api.get("/users");
-        setUsers(Array.isArray(response.data) ? response.data : []);
+        const [usersRes, meRes] = await Promise.all([
+          api.get("/users"),
+          api.get("/me").catch(() => ({ data: null }))
+        ]);
+        setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+        if (meRes.data) {
+          setCurrentUser(meRes.data);
+        }
       } catch (error) {
         console.error(error);
+        toast.error("Failed to load community members");
       } finally {
         setLoading(false);
       }
     };
-    loadUsers();
+    loadData();
   }, []);
+
+  const handleCopyEmail = (userEmail) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(userEmail);
+    }
+    toast.success(`Copied ${userEmail} to clipboard! Paste it into 'My Coupons' to share a gift.`);
+  };
 
   const filteredUsers = users.filter((u) => {
     const s = search.toLowerCase();
@@ -86,42 +102,71 @@ export default function Users() {
       ) : (
         <div className="row g-3">
           {filteredUsers.map((user) => {
-            // Generate initials avatar
+            const isMe = currentUser && currentUser.id === user.id;
             const initials = user.name
               ? user.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()
               : "U";
 
             return (
               <div key={user.id} className="col-12 col-md-6 col-lg-4">
-                <div className="card h-100 shadow-sm border-0" style={{ borderRadius: "16px", border: "1px solid #e2e8f0" }}>
-                  <div className="card-body p-4 d-flex align-items-center gap-3">
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0 fw-bold text-white shadow-sm"
-                      style={{
-                        width: "52px",
-                        height: "52px",
-                        background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
-                        fontSize: "18px"
-                      }}
-                    >
-                      {initials}
-                    </div>
+                <div
+                  className={`card h-100 shadow-sm border-0 ${isMe ? "border-primary" : ""}`}
+                  style={{
+                    borderRadius: "16px",
+                    border: isMe ? "2px solid #6366f1" : "1px solid #e2e8f0",
+                    backgroundColor: isMe ? "#f8faff" : "#ffffff"
+                  }}
+                >
+                  <div className="card-body p-4 d-flex flex-column justify-content-between">
+                    <div className="d-flex align-items-start gap-3 mb-3">
+                      <div
+                        className="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0 fw-bold text-white shadow-sm"
+                        style={{
+                          width: "50px",
+                          height: "50px",
+                          background: isMe
+                            ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                            : "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)",
+                          fontSize: "17px"
+                        }}
+                      >
+                        {initials}
+                      </div>
 
-                    <div className="flex-grow-1 overflow-hidden">
-                      <div className="d-flex align-items-center justify-content-between mb-1">
-                        <h6 className="fw-bold text-dark text-truncate mb-0" style={{ fontSize: "16px" }}>
-                          {user.name}
-                        </h6>
-                        <span className="badge-soft badge-soft-primary" style={{ fontSize: "11px" }}>
-                          #{user.id}
+                      <div className="flex-grow-1 overflow-hidden">
+                        <div className="d-flex align-items-center justify-content-between mb-1 gap-1">
+                          <h6 className="fw-bold text-dark text-truncate mb-0" style={{ fontSize: "16px" }}>
+                            {user.name}
+                          </h6>
+                          {isMe ? (
+                            <span className="badge bg-success" style={{ fontSize: "10px" }}>
+                              You
+                            </span>
+                          ) : (
+                            <span className="badge-soft badge-soft-primary" style={{ fontSize: "11px" }}>
+                              #{user.id}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-muted small text-truncate mb-1" style={{ fontSize: "13px" }}>
+                          {user.email}
+                        </p>
+                        <span className="badge-soft badge-soft-success" style={{ fontSize: "10px" }}>
+                          ● Active Member
                         </span>
                       </div>
-                      <p className="text-muted small text-truncate mb-2" style={{ fontSize: "13px" }}>
-                        {user.email}
-                      </p>
-                      <span className="badge-soft badge-soft-success" style={{ fontSize: "11px" }}>
-                        ● Active Member
-                      </span>
+                    </div>
+
+                    <div className="pt-2 border-top border-light d-flex justify-content-end">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary py-1 px-3"
+                        style={{ fontSize: "12px", borderRadius: "8px" }}
+                        onClick={() => handleCopyEmail(user.email)}
+                        title="Copy email to share coupon"
+                      >
+                        📋 Copy Email
+                      </button>
                     </div>
                   </div>
                 </div>

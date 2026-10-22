@@ -6,10 +6,10 @@ from app.database.connection import SessionLocal
 from app.dependencies.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin
+from app.schemas.user import UserCreate, UserLogin, ForgotPasswordRequest
 from app.schemas.profile import ProfileUpdate, PaymentDetailsUpdate, PasswordChange
 from app.core.security import hash_password, verify_password, create_access_token
-from app.services.helpers import create_audit_log
+from app.services.helpers import create_audit_log, create_notification
 
 router = APIRouter(tags=["Authentication & Profile"])
 
@@ -104,6 +104,50 @@ def login(
     return {
         "access_token": token,
         "token_type": "bearer"
+    }
+
+
+@router.post("/forgot-password")
+def forgot_password(
+    req: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    clean_email = req.email.strip().lower()
+    existing_user = (
+        db.query(User)
+        .filter(func.lower(User.email) == clean_email)
+        .first()
+    )
+
+    if not existing_user:
+        raise HTTPException(
+            status_code=404,
+            detail="No account found with this email address"
+        )
+
+    if not existing_user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="This account has been disabled. Please contact support."
+        )
+
+    existing_user.password_hash = hash_password(req.new_password)
+    create_audit_log(
+        db,
+        existing_user.id,
+        "FORGOT_PASSWORD_RESET",
+        f"Password reset for {clean_email}"
+    )
+    create_notification(
+        db,
+        existing_user.id,
+        "🔐 Password Reset Successful",
+        "Your account password was successfully reset. You can now use your new password to sign in."
+    )
+    db.commit()
+
+    return {
+        "message": "Password reset successfully! You can now sign in with your new password."
     }
 
 

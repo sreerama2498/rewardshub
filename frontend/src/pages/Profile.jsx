@@ -88,7 +88,8 @@ export default function Profile() {
       toast.success(response.data.message || "Profile updated successfully");
     } catch (error) {
       console.error(error);
-      toast.error("Profile update failed");
+      const msg = error.response?.data?.detail || "Profile update failed";
+      toast.error(typeof msg === "string" ? msg : JSON.stringify(msg));
     } finally {
       setUpdatingProfile(false);
     }
@@ -107,7 +108,8 @@ export default function Profile() {
       toast.success(response.data.message || "Payout details saved successfully!");
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update payout details");
+      const msg = error.response?.data?.detail || "Failed to update payout details";
+      toast.error(typeof msg === "string" ? msg : JSON.stringify(msg));
     } finally {
       setUpdatingPayment(false);
     }
